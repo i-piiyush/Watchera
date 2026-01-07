@@ -2,29 +2,25 @@ import { adminAuth, adminDb } from "@/firebase/admin";
 import { ApiResponse } from "@/types/apiResponse";
 import { NextResponse } from "next/server";
 import { AppUser } from "@/types/user";
+import { syncUserSchema } from "@/app/schemas/authSchema";
 
 export const POST = async (req: Request) => {
   try {
     // 1️⃣ Parse & validate request body
     const body: unknown = await req.json();
 
-    if (
-      typeof body !== "object" ||
-      body === null ||
-      !("idToken" in body) ||
-      typeof (body as any).idToken !== "string"
-    ) {
+    const parsed = syncUserSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json<ApiResponse>(
         {
           success: false,
-          message: "Invalid or missing idToken",
+          message: "Invalid request body",
           statusCode: 400,
         },
         { status: 400 }
       );
     }
-
-    const { idToken } = body as { idToken: string };
+    const { idToken } = parsed.data;
 
     // 2️⃣ Verify Firebase ID token (throws if invalid/expired)
     const decoded = await adminAuth.verifyIdToken(idToken);
@@ -35,13 +31,12 @@ export const POST = async (req: Request) => {
     // 4️⃣ Build strongly-typed app user object
     const userData: AppUser = {
       uid: decoded.uid,
-      email: decoded.email ?? null, // email can be null (edge case)
+      email: decoded.email ?? null,
       name: decoded.name ?? "",
-      role: "user",                // never trust client for role
-      phoneVerified: false,         // default until OTP flow
-      createdAt: Date.now(),        // ⚠️ ideally set only once (see note below)
+      role: "user",
+      phoneVerified: false,
+      createdAt: Date.now(),
     };
-
     // 5️⃣ Idempotent write (safe on repeated logins)
     await ref.set(userData, { merge: true });
 
