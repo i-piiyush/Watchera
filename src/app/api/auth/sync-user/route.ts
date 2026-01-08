@@ -11,7 +11,7 @@ export const POST = async (req: Request) => {
 
     const parsed = syncUserSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json<ApiResponse>(
+      return NextResponse.json<ApiResponse<null>>(
         {
           success: false,
           message: "Invalid request body",
@@ -27,6 +27,7 @@ export const POST = async (req: Request) => {
 
     // 3️⃣ Reference user document (UID = doc ID)
     const ref = adminDb.collection("users").doc(decoded.uid);
+    const snap = await ref.get()
 
     // 4️⃣ Build strongly-typed app user object
     const userData: AppUser = {
@@ -37,11 +38,24 @@ export const POST = async (req: Request) => {
       phoneVerified: false,
       createdAt: Date.now(),
     };
-    // 5️⃣ Idempotent write (safe on repeated logins)
-    await ref.set(userData, { merge: true });
+
+
+    if(!snap.exists){
+      await ref.set(userData);
+       return NextResponse.json<ApiResponse<null>>(
+      {
+        success: true,
+        message: "User synced successfully",
+        statusCode: 200,
+      },
+      { status: 200 }
+    );
+    }
+    
+    
 
     // 6️⃣ Success response (HTTP status = source of truth)
-    return NextResponse.json<ApiResponse>(
+    return NextResponse.json<ApiResponse<null>>(
       {
         success: true,
         message: "User synced successfully",
@@ -53,7 +67,7 @@ export const POST = async (req: Request) => {
     console.error("Error while syncing user:", error);
 
     // 7️⃣ Auth errors vs server errors (basic separation)
-    return NextResponse.json<ApiResponse>(
+    return NextResponse.json<ApiResponse<null>>(
       {
         success: false,
         message: "Invalid or expired token",

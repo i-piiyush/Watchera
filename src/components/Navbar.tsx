@@ -29,6 +29,7 @@ const Navbar = () => {
     // 🔓 Logged in → logout
     try {
       await signOut(auth);
+    
       toast.success("Logged out successfully");
       router.replace("/login");
     } catch (error) {

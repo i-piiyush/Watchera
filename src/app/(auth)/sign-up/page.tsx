@@ -2,11 +2,11 @@
 
 import { signupSchema } from "@/app/schemas/signUpSchema";
 import Beams from "@/components/Beams";
-import PixelBlast from "@/components/PixelBlast";
-import Silk from "@/components/Silk";
 import { Spinner } from "@/components/ui/spinner";
 import { auth } from "@/firebase/client";
+
 import { ApiResponse } from "@/types/apiResponse";
+import { AppUser } from "@/types/user";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios, { AxiosError } from "axios";
 import { FirebaseError } from "firebase/app";
@@ -16,6 +16,7 @@ import {
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
+
 import Link from "next/link";
 
 import { useRouter } from "next/navigation";
@@ -32,6 +33,8 @@ const SignUp = () => {
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
   });
+
+  
 
   const onSubmit = async (data: z.infer<typeof signupSchema>) => {
     try {
@@ -53,11 +56,12 @@ const SignUp = () => {
       const idToken = await result.user.getIdToken(true);
 
       // 4️⃣ Sync user with backend
-      const res = await axios.post<ApiResponse>("/api/auth/sync-user", {
+      const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
         idToken,
       });
 
       if (res.status === 200) {
+      
         toast.success("Account created successfully 🎉");
         router.push("/products");
       } else {
@@ -83,7 +87,7 @@ const SignUp = () => {
       }
 
       // 🔴 Backend / Axios errors (sync-user stage)
-      const err = error as AxiosError<ApiResponse>;
+      const err = error as AxiosError<ApiResponse<AppUser>>;
       toast.error(
         err.response?.data?.message || "Server error. Please try again later."
       );
@@ -104,7 +108,7 @@ const SignUp = () => {
       const idToken = await result.user.getIdToken();
 
       // 4️⃣ Sync user with backend
-      const res = await axios.post<ApiResponse>("/api/auth/sync-user", {
+      const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
         idToken,
       });
 
@@ -137,7 +141,7 @@ const SignUp = () => {
       }
 
       // 🔴 Backend / Axios errors
-      const err = error as AxiosError<ApiResponse>;
+      const err = error as AxiosError<ApiResponse<AppUser> >;
       toast.error(
         err.response?.data?.message || "Server error. Please try again later."
       );

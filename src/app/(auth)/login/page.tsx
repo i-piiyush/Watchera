@@ -1,11 +1,11 @@
 "use client";
 
 import { loginSchema } from "@/app/schemas/loginSchema";
-import Beams from "@/components/Beams";
 import Silk from "@/components/Silk";
 import { Spinner } from "@/components/ui/spinner";
 import { auth } from "@/firebase/client";
 import { ApiResponse } from "@/types/apiResponse";
+import { AppUser } from "@/types/user";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios, { AxiosError } from "axios";
 import { FirebaseError } from "firebase/app";
@@ -29,6 +29,8 @@ const Login = () => {
     resolver: zodResolver(loginSchema),
   });
 
+ 
+
   const handleGoogleLogin = async () => {
     try {
       // 1️⃣ Configure Google provider
@@ -41,17 +43,22 @@ const Login = () => {
       const idToken = await result.user.getIdToken();
 
       // 4️⃣ Call backend to sync Firebase user → App user
-      const res = await axios.post<ApiResponse>("/api/auth/sync-user", {
+      const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
         idToken, // payload key MUST match backend
       });
 
+     
+
+
+
       // 5️⃣ Use HTTP status as source of truth (not body)
       if (res.status === 200) {
+     
         router.push("/products");
       }
     } catch (error) {
       // 6️⃣ Strongly typed axios error handling
-      const err = error as AxiosError<ApiResponse>;
+      const err = error as AxiosError<ApiResponse<AppUser>>;
 
       // Backend-provided message (preferred)
       if (err.response?.data?.message) {
@@ -77,11 +84,12 @@ const Login = () => {
       const idToken = await result.user.getIdToken();
 
       // 3️⃣ Sync user with backend (idempotent)
-      const res = await axios.post<ApiResponse>("/api/auth/sync-user", {
+      const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
         idToken,
       });
-      console.log(res.data);
+      
       if (res.status === 200) {
+      
         toast.success("Logged in successfully 🎉");
         router.push("/products");
       } else {
@@ -135,7 +143,7 @@ const Login = () => {
       }
 
       // 🔴 Backend / Axios errors (sync-user stage)
-      const err = error as AxiosError<ApiResponse>;
+      const err = error as AxiosError<ApiResponse<AppUser>>;
       toast.error(
         err.response?.data?.message || "Server error. Please try again later."
       );
