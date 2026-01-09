@@ -15,6 +15,6 @@ export const useRequireAdmin = () => {
       else if (role !== "admin") router.replace("/products");
     }
 
-    console.log({ loading, user: !!user, role });
+    
   }, [user, role, loading, router]);
 };

@@ -1,8 +1,8 @@
-export default function AdminDashboard() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-      <p>Overview, stats, shortcuts</p>
-    </div>
-  );
+import { redirect } from "next/navigation";
+
+const page = () => {
+  redirect("/admin/add-products");
+
 }
+
+export default page
