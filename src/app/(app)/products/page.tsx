@@ -1,4 +1,5 @@
 import Navbar from '@/components/Navbar'
+import ProductGrid from '@/components/ProductGrid'
 import React from 'react'
 
 const Products = () => {
@@ -6,7 +7,10 @@ const Products = () => {
     <div>
       
       <Navbar />
-      Product page</div>
+      Product page
+      <ProductGrid />
+      
+      </div>
   )
 }
 

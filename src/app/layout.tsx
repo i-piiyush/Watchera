@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { Auth } from "firebase-admin/auth";
 import AuthProvider from "@/app/providers/authProvider";
+import ReactQueryProvider from "./providers/ReactQueryProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,11 +30,14 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning={true}
       >
-        <AuthProvider>
-          {children}
-          <Toaster className="dark" position="top-center" />
-        </AuthProvider>
+        <ReactQueryProvider>
+          <AuthProvider>
+            {children}
+            <Toaster className="dark" position="top-center" />
+          </AuthProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );
