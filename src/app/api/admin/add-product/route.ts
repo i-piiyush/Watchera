@@ -9,14 +9,15 @@ export const POST = async (req: Request) => {
     //fetching tokens
     const authHeader = req.headers.get("authorization");
 
-
-
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json<ApiResponse<null>>({
-        success: false,
-        message: "Unauthorized",
-        statusCode: 401,
-      });
+      return NextResponse.json<ApiResponse<null>>(
+        {
+          success: false,
+          message: "Unauthorized",
+          statusCode: 401,
+        },
+        { status: 401 }
+      );
     }
 
     //getting token
@@ -26,33 +27,44 @@ export const POST = async (req: Request) => {
     const decoded = await adminAuth.verifyIdToken(token);
     const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
 
+    if (!userSnap.exists) {
+      return NextResponse.json<ApiResponse<null>>(
+        {
+          success: false,
+          message: "User record not found",
+          statusCode: 401,
+        },
+        { status: 401 }
+      );
+    }
+
     //checking if user is admin
     if (userSnap.data()?.role !== "admin") {
-      return NextResponse.json<ApiResponse<null>>({
-        success: false,
-        message: "Forbidden",
-        statusCode: 403,
-      });
+      return NextResponse.json<ApiResponse<null>>(
+        {
+          success: false,
+          message: "Forbidden",
+          statusCode: 403,
+        },
+        {
+          status: 403,
+        }
+      );
     }
 
     //validating body
     const body = await req.json();
     const parsed = createProductSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json<ApiResponse<null>>({
-        success: false,
-        message: "Invalid request body",
-        statusCode: 400,
-      });
-    }
-
-    // 2️⃣ Extract images MANUALLY
-    const images = body.images;
-
-    if (!Array.isArray(images) || images.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "Images are required" },
-        { status: 400 }
+      return NextResponse.json<ApiResponse<null>>(
+        {
+          success: false,
+          message: "Invalid request body",
+          statusCode: 400,
+        },
+        {
+          status: 400,
+        }
       );
     }
 
@@ -61,8 +73,7 @@ export const POST = async (req: Request) => {
 
     const product: Product = {
       uid: ref.id,
-      ...parsed.data, // name, price, stock, description
-      images, // ✅ THIS WAS MISSING
+      ...parsed.data,
       avgRating: 0,
       reviewCount: 0,
       createdAt: Date.now(),
@@ -71,19 +82,27 @@ export const POST = async (req: Request) => {
 
     await ref.set(product);
 
-    return NextResponse.json<ApiResponse<{ id: string }>>({
-      success: true,
-      message: "Product Added To Database",
-      statusCode: 201,
-      data: { id: ref.id },
-    });
+    return NextResponse.json<ApiResponse<{ id: string }>>(
+      {
+        success: true,
+        message: "Product Added To Database",
+        statusCode: 201,
+        data: { id: ref.id },
+      },
+      {
+        status: 201,
+      }
+    );
   } catch (error) {
     console.error("Add product error:", error);
 
-    return NextResponse.json<ApiResponse<null>>({
-      success: false,
-      message: "Server error",
-      statusCode: 500,
-    });
+    return NextResponse.json<ApiResponse<null>>(
+      {
+        success: false,
+        message: "Server error",
+        statusCode: 500,
+      },
+      { status: 500 }
+    );
   }
 };

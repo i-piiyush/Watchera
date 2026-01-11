@@ -1,9 +1,25 @@
 import { z } from "zod";
 
-export const createProductSchema = z.object({
-    name: z.string().min(3, "Name must be at least 3 characters").max(100, "Name must not exceed 100 characters"),
-    description: z.string().min(10, "Description must be at least 10 characters").max(1000, "Description must not exceed 1000 characters"),
-    price: z.number().positive("Price must be a positive number"),
-    stock: z.number().int("Stock must be an integer").min(0, "Stock cannot be negative"),
-   
+const imageSchema = z.object({
+  url: z.string().url(),
+  fileId: z.string(),
 });
+
+const variantSchema = z.object({
+  color: z.string().min(1),
+  stock: z.number().int().min(0),
+  images: z.array(imageSchema).min(1),
+});
+
+export const createProductSchema = z.object({
+  name: z.string().min(2),
+  description: z.string().min(10),
+  price: z.number().positive(),
+  variants: z.array(variantSchema).min(1),
+});
+
+export const createProductSchemaFrontend = z.object({
+  name: z.string().min(2),
+  description: z.string().min(10),
+  price: z.number().positive(),
+})

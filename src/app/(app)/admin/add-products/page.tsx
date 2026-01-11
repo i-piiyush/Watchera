@@ -1,34 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import axios, { AxiosError } from "axios";
-// Added ImagePlus icon for the empty state
-import { Loader2, X, ImagePlus } from "lucide-react"; 
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { X, Plus, Trash2, Package, Layers, Image as ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 
-// Data & Types
-import { createProductSchema } from "@/app/schemas/addProductSchema";
 import { auth } from "@/firebase/client";
 import { ApiResponse } from "@/types/apiResponse";
 import { Product } from "@/types/product";
 
-// Custom Components
-import ImageUploader from "@/components/imageUploader/imageUploader";
-
-// Shadcn UI Components
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label"; // Assuming you have this shadcn component
+import { Separator } from "@/components/ui/separator"; // Assuming you have this shadcn component
 import {
   Card,
   CardContent,
@@ -36,228 +24,390 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { toast } from "sonner";
+import { createProductSchemaFrontend } from "@/app/schemas/addProductSchema";
+import ImageUploader from "@/components/imageUploader/imageUploader";
+import { Spinner } from "@/components/ui/spinner";
 
+/* ---------------- TYPES ---------------- */
 
 type Image = {
   url: string;
   fileId: string;
 };
 
-const AddProducts = () => {
-  const [images, setImages] = useState<Image[]>([]);
-  const [loading, setLoading] = useState(false);
- 
+type VariantForm = {
+  color: string;
+  stock: number;
+  images: Image[];
+};
 
-  const form = useForm<z.infer<typeof createProductSchema>>({
-    resolver: zodResolver(createProductSchema),
+/* ---------------- UTILS ---------------- */
+
+const buildImageFolder = (productName: string, color: string) => {
+  return `/watchera/products/${productName
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")}/${color.toLowerCase()}`;
+};
+
+/* ---------------- COMPONENT ---------------- */
+
+const AddProducts = () => {
+  /* ---------- REACT HOOK FORM (PRODUCT ONLY) ---------- */
+  const form = useForm<z.infer<typeof createProductSchemaFrontend>>({
+    resolver: zodResolver(createProductSchemaFrontend),
     defaultValues: {
       name: "",
       description: "",
-      price: undefined, // Better for number inputs to start undefined or empty string so placeholder shows
-      stock: undefined,
+      price: undefined,
     },
   });
 
-  const onSubmit = async (data: z.infer<typeof createProductSchema>) => {
-    if (images.length === 0) {
-     toast.error("Please upload at least one product image.");
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+    reset,
+  } = form;
+
+  /* ---------- VARIANTS STATE ---------- */
+  const [variants, setVariants] = useState<VariantForm[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  /* ---------- VARIANT HELPERS ---------- */
+
+  const addVariant = () => {
+    setVariants((prev) => [
+      ...prev,
+      { color: "", stock: 0, images: [] },
+    ]);
+  };
+
+  const updateVariant = (
+    index: number,
+    field: keyof VariantForm,
+    value: any
+  ) => {
+    setVariants((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v))
+    );
+  };
+
+  const removeVariant = (index: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  /* ---------- SUBMIT ---------- */
+
+  const onSubmit = async (
+    data: z.infer<typeof createProductSchemaFrontend>
+  ) => {
+    if (variants.length === 0) {
+      toast.error("At least one variant is required");
       return;
+    }
+
+    for (const v of variants) {
+      if (!v.color || v.images.length === 0) {
+        toast.error("Each variant must have color & images");
+        return;
+      }
     }
 
     try {
       setLoading(true);
-      // Ensure auth is ready before getting token
-      if(!auth.currentUser) {
-         toast.error("You must be logged in to perform this action.");
-          return;
+
+      if (!auth.currentUser) {
+        toast.error("You must be logged in");
+        return;
       }
+
       const token = await auth.currentUser.getIdToken();
 
       await axios.post<ApiResponse<Product>>(
         "/api/admin/add-product",
-        { ...data, images },
-        { headers: { Authorization: `Bearer ${token}` }}
+        {
+          ...data,
+          variants,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
-   toast.success("Product added successfully!");
-      form.reset();
-      setImages([]);
-
+      toast.success("Product added successfully");
+      reset();
+      setVariants([]);
     } catch (error) {
       const err = error as AxiosError<ApiResponse<null>>;
-     toast.error(
-        err.response?.data.message || "An error occurred while adding the product."
-      );
+      toast.error(err.response?.data.message || "Failed to add product");
     } finally {
       setLoading(false);
     }
   };
 
-  const removeImage = (fileId: string) => {
-    setImages((prev) => prev.filter((img) => img.fileId !== fileId));
-  };
+  /* ---------- UI ---------- */
 
   return (
-    <div className="flex justify-center items-center min-h-screen p-4 ">
-      <Card className="w-full max-w-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl">Create Product</CardTitle>
-          <CardDescription>
-            Add a new item to your inventory. Fill out the details below.
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              
-              {/* --- IMPROVED Image Upload Section --- */}
-              <div className="space-y-4">
-                <FormLabel className="text-base">Product Gallery</FormLabel>
-                
-                {/* The "Dropzone" Container */}
-                <div className={`border-2 border-dashed rounded-xl p-6 flex flex-col gap-4 items-center justify-center bg-muted/30 hover:bg-muted/50 transition-colors ${images.length === 0 ? 'py-12' : ''}`}>
-                  
-                  {/* The Upload Trigger Component */}
-                  <div className={images.length === 0 ? "scale-110 transition-transform" : ""}>
-                     <ImageUploader
-                      onUpload={(image) => setImages((prev) => [...prev, image])}
-                    />
+    <div className="max-w-5xl mx-auto py-10 px-4">
+      <div className="grid gap-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Create Product</h1>
+            <p className="text-muted-foreground mt-1">
+              Add a new product with multiple color variants and stocks.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* LEFT COLUMN: MAIN INFO */}
+            <div className="md:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="size-5 text-muted-foreground" />
+                    Product Details
+                  </CardTitle>
+                  <CardDescription>
+                    Basic information about the watch.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Product Name</Label>
+                      <Input
+                        id="name"
+                        placeholder="e.g. Chronos Silver"
+                        {...register("name")}
+                      />
+                      {errors.name && (
+                        <p className="text-sm text-destructive">
+                          {errors.name.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Price (₹)</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        placeholder="0.00"
+                        {...register("price", { valueAsNumber: true })}
+                      />
+                      {errors.price && (
+                        <p className="text-sm text-destructive">
+                          {errors.price.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Empty State Message */}
-                  {images.length === 0 && (
-                    <div className="text-center text-muted-foreground">
-                      <p className="text-sm font-medium">Click button above to upload</p>
-                      <p className="text-xs">Supports JPG, PNG. At least 1 required.</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Describe the product details..."
+                      className="min-h-[120px]"
+                      {...register("description")}
+                    />
+                    {errors.description && (
+                      <p className="text-sm text-destructive">
+                        {errors.description.message}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* VARIANTS SECTION */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <Layers className="size-5 text-muted-foreground" />
+                      Variants
+                    </CardTitle>
+                    <CardDescription>
+                      Manage colors, stock levels, and images.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={addVariant}
+                    className="gap-2"
+                  >
+                    <Plus className="size-4" /> Add Variant
+                  </Button>
+                </CardHeader>
+                
+                <Separator />
+
+                <CardContent className="pt-6 space-y-6">
+                  {variants.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/20">
+                      <Layers className="size-10 mx-auto mb-3 opacity-50" />
+                      <p>No variants added yet.</p>
+                      <p className="text-sm">Click "Add Variant" to start.</p>
                     </div>
-                  )}
-                  
-                  {/* Image Preview Grid (shown if images exist) */}
-                  {images.length > 0 && (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 w-full mt-2">
-                      {images.map((img, i) => (
-                        <div key={img.fileId} className="relative group aspect-square rounded-lg overflow-hidden border bg-background shadow-sm">
-                          <img
-                            src={img.url}
-                            alt={`product-${i}`}
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                          />
-                          {/* Remove Button with background blur */}
-                          <button
-                            type="button"
-                            onClick={() => removeImage(img.fileId)}
-                            className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                  ) : (
+                    variants.map((variant, index) => {
+                      const productName = watch("name");
+                      return (
+                        <div
+                          key={index}
+                          className="relative group border rounded-xl p-5 bg-card shadow-sm space-y-5 transition-all hover:border-primary/50"
+                        >
+                          <div className="flex justify-between items-start">
+                            <h4 className="font-medium flex items-center gap-2 text-sm text-muted-foreground">
+                              <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                                {index + 1}
+                              </span>
+                              Variant Configuration
+                            </h4>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive h-8 w-8"
+                              onClick={() => removeVariant(index)}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs uppercase text-muted-foreground font-bold">
+                                Color Name
+                              </Label>
+                              <Input
+                                placeholder="e.g. Midnight Blue"
+                                value={variant.color}
+                                onChange={(e) =>
+                                  updateVariant(index, "color", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs uppercase text-muted-foreground font-bold">
+                                Stock Quantity
+                              </Label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                value={variant.stock}
+                                onChange={(e) =>
+                                  updateVariant(
+                                    index,
+                                    "stock",
+                                    Number(e.target.value)
+                                  )
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-3 bg-muted/30 p-4 rounded-lg border border-dashed">
+                            <Label className="flex items-center gap-2 text-xs uppercase text-muted-foreground font-bold">
+                              <ImageIcon className="size-3" /> Variant Images
+                            </Label>
+                            
+                            <div className="flex flex-wrap gap-4 items-end">
+                                <div className="flex-1 min-w-[200px]">
+                                    <ImageUploader
+                                    folder={
+                                        productName && variant.color
+                                        ? buildImageFolder(productName, variant.color)
+                                        : "/watchera/drafts"
+                                    }
+                                    onUpload={(img) =>
+                                        updateVariant(index, "images", [
+                                        ...variant.images,
+                                        img,
+                                        ])
+                                    }
+                                    />
+                                </div>
+                                
+                                {variant.images.length > 0 && (
+                                    <div className="flex gap-2 overflow-x-auto pb-2 max-w-full">
+                                        {variant.images.map((img) => (
+                                        <div key={img.fileId} className="relative shrink-0">
+                                            <img
+                                            src={img.url}
+                                            alt="Preview"
+                                            className="h-16 w-16 rounded-md object-cover border bg-background"
+                                            />
+                                        </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {!productName || !variant.color ? (
+                                <p className="text-[10px] text-amber-500 font-medium">
+                                    * Enter Product Name and Variant Color to enable upload
+                                </p>
+                            ) : null}
+                          </div>
                         </div>
-                      ))}
+                      );
+                    })
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* RIGHT COLUMN: ACTIONS & SUMMARY */}
+            <div className="space-y-6">
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Publish</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    <div className="flex justify-between py-1">
+                        <span>Variants</span>
+                        <span className="font-medium text-foreground">{variants.length}</span>
                     </div>
-                  )}
-                </div>
-              </div>
-              {/* --- End Improved Section --- */}
-
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* --- Name --- */}
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Product Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Rolex Submariner" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* --- Description --- */}
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Tell us about the product..."
-                          className="resize-none"
-                          rows={4}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* --- Price --- */}
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price</FormLabel>
-                      <FormControl>
-                        {/* Using type="number" and handling float conversion */}
-                        <Input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0.00" 
-                          {...field}
-                          // React Hook Form needs help with numbers in inputs
-                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                          value={field.value ?? ''} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* --- Stock --- */}
-                <FormField
-                  control={form.control}
-                  name="stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock Quantity</FormLabel>
-                      <FormControl>
-                         <Input 
-                          type="number" 
-                          placeholder="0" 
-                          {...field}
-                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
-                          value={field.value ?? ''} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* --- Submit Button --- */}
-              <Button type="submit" size="lg" className="w-full text-base" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Publishing Product...
-                  </>
-                ) : (
-                  "Publish Product"
-                )}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                    <div className="flex justify-between py-1 border-t mt-2 pt-2">
+                        <span>Total Stock</span>
+                        <span className="font-medium text-foreground">
+                            {variants.reduce((acc, curr) => acc + (curr.stock || 0), 0)}
+                        </span>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {loading ? (
+                        <>
+                        <Spinner className="mr-2 text-primary-foreground" /> Publishing...
+                        </>
+                    ) : (
+                      "Publish Product"
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

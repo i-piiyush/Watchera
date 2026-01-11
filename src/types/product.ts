@@ -1,18 +1,22 @@
-export interface Product {
-  uid: string;                // doc id
+export type ProductImage = {
+  url: string;
+  fileId: string;
+};
+
+export type ProductVariant = {
+  color: string;
+  images: ProductImage[];
+  stock: number;
+};
+
+export type Product = {
+  uid: string;
   name: string;
   description: string;
   price: number;
-  stock: number;
-
-  images: {
-    url: string;
-    fileId: string;          // ImageKit file id (important for delete)
-  }[];
-
-  avgRating: number;         // 0–5 (cached)
+  variants: ProductVariant[]; 
+  avgRating: number;
   reviewCount: number;
-
   createdAt: number;
   updatedAt: number;
-}
+};
