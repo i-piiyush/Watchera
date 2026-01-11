@@ -1,7 +1,9 @@
 export interface Review {
   userId: string;
+  user:string,
+  avatar:string
   rating: number; // 1–5
-  title: string; // short summary
-  description: string; // detailed review
+  content:string,
+  likes:number
   createdAt: number;
 }
