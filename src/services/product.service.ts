@@ -12,9 +12,7 @@ export const fetchProducts= async ({
 
     console.log(res.data)
     return res.data
-    if (res.status !== 200) {
-      throw new Error("failed to fetch products");
-    }
+  
   } catch (error) {
     const err = error as AxiosError;
     console.log("error while fetching products: ", err.response?.data);

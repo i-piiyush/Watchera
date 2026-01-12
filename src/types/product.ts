@@ -14,8 +14,8 @@ export type Product = {
   name: string;
   description: string;
   price: number;
-  variants: ProductVariant[]; 
-  avgRating: number;
+  variants: ProductVariant[];
+  ratingSum: number;
   reviewCount: number;
   createdAt: number;
   updatedAt: number;

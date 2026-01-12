@@ -1,9 +1,14 @@
-export interface Review {
+export type Reply = {
   userId: string;
-  user:string,
-  avatar:string
-  rating: number; // 1–5
-  content:string,
-  likes:number
+  content: string;
   createdAt: number;
-}
+};
+
+export type Review = {
+  userId: string;        // author uid
+  rating: number;        // 1–5
+  content: string;
+  replies: Reply[];
+  likes: number;
+  createdAt: number;
+};
