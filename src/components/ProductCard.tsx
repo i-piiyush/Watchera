@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Star, ShoppingBag } from "lucide-react"; // Assuming you have lucide-react (standard with shadcn)
 import Link from "next/link";
+import { productRating } from "@/utils/productRating";
 
 interface ProductCardProps {
   product: Product;
@@ -46,7 +47,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           {/* Floating Badges */}
           <div className="absolute top-3 left-3 flex flex-col gap-2">
             {/* Example logic for "New" or "Best Seller" - customizable */}
-            {product.avgRating > 4.5 && (
+            {productRating(product) > 4.5 && (
               <Badge
                 variant="secondary"
                 className="bg-white/90 text-black rounded-sm backdrop-blur-sm shadow-sm font-normal text-[10px] tracking-wider uppercase"
@@ -92,7 +93,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             {/* Rating */}
             <div className="flex items-center gap-1 text-zinc-500">
               <Star className="w-3 h-3 fill-zinc-900 text-zinc-900" />
-              <span className="text-xs font-medium">{product.avgRating}</span>
+              <span className="text-xs font-medium">{productRating(product)}</span>
               <span className="text-[10px] text-zinc-400">
                 ({product.reviewCount})
               </span>

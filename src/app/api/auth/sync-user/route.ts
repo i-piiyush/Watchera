@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { AppUser } from "@/types/user";
 import { syncUserSchema } from "@/app/schemas/authSchema";
 
+
 export const POST = async (req: Request) => {
   try {
     // 1️⃣ Parse & validate request body
@@ -24,6 +25,7 @@ export const POST = async (req: Request) => {
 
     // 2️⃣ Verify Firebase ID token (throws if invalid/expired)
     const decoded = await adminAuth.verifyIdToken(idToken);
+    const avatar = decoded.picture ? decoded.picture : ""
 
     // 3️⃣ Reference user document (UID = doc ID)
     const ref = adminDb.collection("users").doc(decoded.uid);
@@ -34,6 +36,8 @@ export const POST = async (req: Request) => {
       uid: decoded.uid,
       email: decoded.email ?? null,
       name: decoded.name ?? "",
+      avatar:avatar,
+      emailVerified:false,
       role: "user",
       phoneVerified: false,
       createdAt: Date.now(),

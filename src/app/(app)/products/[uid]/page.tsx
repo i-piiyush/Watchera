@@ -9,9 +9,7 @@ import { ApiResponse } from "@/types/apiResponse";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-import { Label } from "@/components/ui/label";
 import {
   Carousel,
   CarouselContent,
@@ -21,52 +19,15 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 
-import {
-  Star,
-  ShoppingBag,
-  ArrowLeft,
-  ThumbsUp,
-  MessageSquare,
-  UserCircle2,
-} from "lucide-react";
+import { Star, ShoppingBag, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
-import { auth } from "@/firebase/client";
+import { ProductReviews } from "@/components/ProductReview";
+import { productRating } from "@/utils/productRating";
 
-// --- INITIAL DATA ---
-const INITIAL_REVIEWS = [
-  {
-    id: 1,
-    user: "Aarav P.",
-    avatar: "",
-    rating: 5,
-    time: "2 weeks ago",
-    content:
-      "Absolutely stunning timepiece. The finish is even better in person than in the photos. It feels heavy and premium on the wrist. Worth every rupee.",
-    likes: 24,
-  },
-  {
-    id: 2,
-    user: "Sarah Jenkins",
-    avatar: "https://i.pravatar.cc/150?u=a042581f4e29026704d",
-    rating: 4,
-    time: "1 month ago",
-    content:
-      "Great watch, minimalist and elegant. The delivery was super fast (arrived in 2 days). Deducting one star because the strap was a bit stiff initially, but it softened up after a week.",
-    likes: 8,
-  },
-  {
-    id: 3,
-    user: "Vikram Singh",
-    avatar: "",
-    rating: 5,
-    time: "2 months ago",
-    content:
-      "Classy. I wear it to meetings and get compliments all the time. The unboxing experience was also very luxury.",
-    likes: 12,
-  },
-];
+
+
 
 const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
   const { uid } = React.use(params);
@@ -78,17 +39,11 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
     null
   );
 
-  // Review & Auth State (Demo)
-  const [reviews, setReviews] = useState(INITIAL_REVIEWS);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // DEMO STATE
-  const [newReviewText, setNewReviewText] = useState("");
-  const [newReviewRating, setNewReviewRating] = useState(5);
-
   // Carousel State
   const [api, setApi] = React.useState<CarouselApi>();
   const [current, setCurrent] = React.useState(0);
 
-  const { user, loading } = useAuthStore();
+  const { loading } = useAuthStore();
 
   // 1. Fetch Data
   useEffect(() => {
@@ -114,11 +69,6 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
       }
     };
 
-    if (!loading) {
-      if (user) {
-        setIsLoggedIn(true);
-      }
-    }
     fetchProduct();
   }, [uid, loading]);
 
@@ -139,45 +89,8 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
     }
   };
 
-  // 4. Handle Post Review
-const handlePostReview = async () => {
-  try {
-    const user = auth.currentUser;
-    console.log("user:",user)
-
-    if (!user) {
-      console.log("User not logged in");
-      return;
-    }
-
-    const token = await user.getIdToken();
-
-    const demoReview = {
-      userId: user.uid,
-      user: user.displayName ?? "Anonymous",
-      avatar: user.photoURL ?? "",
-      rating: 5,
-      content: "This is a demo review for testing purposes.",
-      replies: [],
-      likes: 0,
-      createdAt: Date.now(),
-    };
-
-    const res = await axios.post(
-      "/api/reveiw/MMFdfTsufCtm7sjeeJda", // ✅ FIXED
-      demoReview,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    console.log("Review added:", res.data);
-  } catch (error) {
-    console.error("Failed to add review:", error);
-  }
-};
+ 
+  
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -302,7 +215,7 @@ const handlePostReview = async () => {
                       <Star className="w-4 h-4 fill-current" />
                     </div>
                     <span className="text-sm font-medium text-zinc-900">
-                      {product.ratingSum}
+                      {productRating(product)}
                     </span>
                     <span className="text-xs text-zinc-500 ml-1">
                       ({product.reviewCount} reviews)
@@ -351,180 +264,7 @@ const handlePostReview = async () => {
             </div>
 
             {/* --- REVIEWS SECTION --- */}
-            <div className="pt-8">
-              {/* Header with Demo Toggle */}
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-light flex items-center gap-2">
-                  Reviews{" "}
-                  <span className="text-zinc-400 text-lg">
-                    {reviews.length}
-                  </span>
-                </h3>
-
-                
-        
-              </div>
-
-              {/* ADD REVIEW INPUT */}
-              <div className="mb-10">
-                {isLoggedIn ? (
-                  <div className="flex gap-4 animate-in fade-in slide-in-from-top-2">
-                    <Avatar className="w-10 h-10 border border-zinc-100">
-                      <AvatarImage src="https://github.com/shadcn.png" />
-                      <AvatarFallback>ME</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 space-y-3">
-                      <div className="space-y-1">
-                        <p className="text-xs text-zinc-500 ml-1">
-                          Rate this product
-                        </p>
-                        <div className="flex text-zinc-200">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              onClick={() => setNewReviewRating(star)}
-                              className="focus:outline-none"
-                            >
-                              <Star
-                                className={cn(
-                                  "w-5 h-5 transition-colors",
-                                  star <= newReviewRating
-                                    ? "fill-yellow-500 text-yellow-500"
-                                    : "hover:text-yellow-400"
-                                )}
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="relative">
-                        <textarea
-                          value={newReviewText}
-                          onChange={(e) => setNewReviewText(e.target.value)}
-                          placeholder="Add a public review..."
-                          className="w-full min-h-[80px] text-sm text-zinc-900 bg-transparent border-b border-zinc-200 focus:border-black focus:outline-none resize-none py-2 placeholder:text-zinc-400"
-                        />
-                        <div className="flex justify-end mt-2">
-                          <Button
-                            onClick={handlePostReview}
-                            disabled={!newReviewText.trim()}
-                            className="h-8 rounded-full text-xs px-6"
-                          >
-                            Post
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-sm border border-zinc-100">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-zinc-200 p-2 rounded-full text-zinc-500">
-                        <UserCircle2 className="w-5 h-5" />
-                      </div>
-                      <p className="text-sm text-zinc-600">
-                        Please log in to share your thoughts.
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-8"
-                      onClick={() => setIsLoggedIn(true)} // Auto log in for demo
-                    >
-                      Log In
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* REVIEW LIST */}
-              <div className="space-y-8">
-                {reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="flex gap-4 group animate-in fade-in duration-500"
-                  >
-                    {/* Avatar */}
-                    <Avatar className="w-10 h-10 border border-zinc-100">
-                      <AvatarImage src={review.avatar} />
-                      <AvatarFallback className="bg-zinc-100 text-zinc-600 text-sm font-medium">
-                        {review.user.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    {/* Content */}
-                    <div className="flex-1 space-y-1.5">
-                      {/* Header */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <span
-                          className={cn(
-                            "font-semibold px-2 py-0.5 rounded-full text-xs",
-                            review.user.includes("You")
-                              ? "bg-black text-white"
-                              : "text-zinc-900 bg-zinc-100"
-                          )}
-                        >
-                          @
-                          {review.user
-                            .replace(/\s/g, "")
-                            .toLowerCase()
-                            .replace(/[^a-z0-9]/g, "")}
-                        </span>
-                        <span className="text-zinc-400 text-xs">•</span>
-                        <span className="text-zinc-500 text-xs">
-                          {review.time}
-                        </span>
-                      </div>
-
-                      {/* Rating Stars (Small) */}
-                      <div className="flex text-yellow-500">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={cn(
-                              "w-3 h-3",
-                              i < review.rating
-                                ? "fill-current"
-                                : "text-zinc-200 fill-zinc-200"
-                            )}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Comment */}
-                      <p className="text-zinc-700 text-sm leading-relaxed">
-                        {review.content}
-                      </p>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-4 pt-1">
-                        <button className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 transition-colors group/btn">
-                          <ThumbsUp className="w-3.5 h-3.5" />
-                          <span className="text-xs font-medium">
-                            {review.likes}
-                          </span>
-                        </button>
-                        <button className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 transition-colors">
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span className="text-xs font-medium">Reply</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* View More Button */}
-              <div className="mt-8 text-center">
-                <Button
-                  variant="outline"
-                  className="rounded-full px-6 text-xs uppercase tracking-wider h-9"
-                >
-                  Load More Reviews
-                </Button>
-              </div>
-            </div>
+            <ProductReviews productId={uid} />
           </div>
         </div>
       </div>

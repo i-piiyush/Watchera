@@ -1,14 +1,11 @@
-export type Reply = {
-  userId: string;
-  content: string;
-  createdAt: number;
-};
-
 export type Review = {
-  userId: string;        // author uid
-  rating: number;        // 1–5
+  uid: string; 
+  userId: string;
+  user:string;
+  rating: number;
+  avatar: string; 
   content: string;
-  replies: Reply[];
   likes: number;
+   likedBy?: string[]
   createdAt: number;
 };
