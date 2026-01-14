@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Auth } from "firebase-admin/auth";
 import AuthProvider from "@/app/providers/authProvider";
 import ReactQueryProvider from "./providers/ReactQueryProvider";
+import Navbar from "@/components/Navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,6 +35,7 @@ export default function RootLayout({
       >
         <ReactQueryProvider>
           <AuthProvider>
+            <Navbar />
             {children}
             <Toaster className="dark" position="top-center" />
           </AuthProvider>

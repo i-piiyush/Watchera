@@ -6,7 +6,7 @@ import React from 'react'
 const Products = () => {
   return (
     <div className="min-h-screen bg-white text-zinc-950 font-sans selection:bg-black selection:text-white">
-      <Navbar />
+     
       
       <main className="container mx-auto px-4 md:px-6 py-12">
         {/* Header Section */}

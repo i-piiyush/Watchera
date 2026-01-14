@@ -5,7 +5,7 @@ import axios, { AxiosError } from "axios";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { X, Plus, Trash2, Package, Layers, Image as ImageIcon } from "lucide-react";
+import { X, Plus, Trash2, Package, Layers, Image as ImageIcon, Percent } from "lucide-react";
 import { toast } from "sonner";
 
 import { auth } from "@/firebase/client";
@@ -15,8 +15,8 @@ import { Product } from "@/types/product";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label"; // Assuming you have this shadcn component
-import { Separator } from "@/components/ui/separator"; // Assuming you have this shadcn component
+import { Label } from "@/components/ui/label"; 
+import { Separator } from "@/components/ui/separator"; 
 import {
   Card,
   CardContent,
@@ -29,7 +29,6 @@ import ImageUploader from "@/components/imageUploader/imageUploader";
 import { Spinner } from "@/components/ui/spinner";
 
 /* ---------------- TYPES ---------------- */
-
 type Image = {
   url: string;
   fileId: string;
@@ -42,7 +41,6 @@ type VariantForm = {
 };
 
 /* ---------------- UTILS ---------------- */
-
 const buildImageFolder = (productName: string, color: string) => {
   return `/watchera/products/${productName
     .toLowerCase()
@@ -51,15 +49,16 @@ const buildImageFolder = (productName: string, color: string) => {
 };
 
 /* ---------------- COMPONENT ---------------- */
-
 const AddProducts = () => {
-  /* ---------- REACT HOOK FORM (PRODUCT ONLY) ---------- */
+  /* ---------- REACT HOOK FORM ---------- */
   const form = useForm<z.infer<typeof createProductSchemaFrontend>>({
     resolver: zodResolver(createProductSchemaFrontend),
     defaultValues: {
       name: "",
       description: "",
       price: undefined,
+      // ✅ FIXED: Changed discountPrice to discountedPrice to match schema
+      discountedPrice: undefined, 
     },
   });
 
@@ -76,7 +75,6 @@ const AddProducts = () => {
   const [loading, setLoading] = useState(false);
 
   /* ---------- VARIANT HELPERS ---------- */
-
   const addVariant = () => {
     setVariants((prev) => [
       ...prev,
@@ -84,11 +82,7 @@ const AddProducts = () => {
     ]);
   };
 
-  const updateVariant = (
-    index: number,
-    field: keyof VariantForm,
-    value: any
-  ) => {
+  const updateVariant = (index: number, field: keyof VariantForm, value: any) => {
     setVariants((prev) =>
       prev.map((v, i) => (i === index ? { ...v, [field]: value } : v))
     );
@@ -99,10 +93,7 @@ const AddProducts = () => {
   };
 
   /* ---------- SUBMIT ---------- */
-
-  const onSubmit = async (
-    data: z.infer<typeof createProductSchemaFrontend>
-  ) => {
+  const onSubmit = async (data: z.infer<typeof createProductSchemaFrontend>) => {
     if (variants.length === 0) {
       toast.error("At least one variant is required");
       return;
@@ -117,7 +108,6 @@ const AddProducts = () => {
 
     try {
       setLoading(true);
-
       if (!auth.currentUser) {
         toast.error("You must be logged in");
         return;
@@ -125,16 +115,18 @@ const AddProducts = () => {
 
       const token = await auth.currentUser.getIdToken();
 
+      // Ensure discountedPrice is explicitly null if undefined
+      const payload = {
+        ...data,
+        discountedPrice: data.discountedPrice || null,
+        variants,
+      };
+
       await axios.post<ApiResponse<Product>>(
         "/api/admin/add-product",
+        payload,
         {
-          ...data,
-          variants,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -150,7 +142,6 @@ const AddProducts = () => {
   };
 
   /* ---------- UI ---------- */
-
   return (
     <div className="max-w-5xl mx-auto py-10 px-4">
       <div className="grid gap-6">
@@ -178,23 +169,24 @@ const AddProducts = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  
+                  {/* Name Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Product Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="e.g. Chronos Silver"
+                      {...register("name")}
+                    />
+                    {errors.name && (
+                      <p className="text-sm text-destructive">{errors.name.message}</p>
+                    )}
+                  </div>
+
+                  {/* PRICE ROW */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Product Name</Label>
-                      <Input
-                        id="name"
-                        placeholder="e.g. Chronos Silver"
-                        {...register("name")}
-                      />
-                      {errors.name && (
-                        <p className="text-sm text-destructive">
-                          {errors.name.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="price">Price (₹)</Label>
+                      <Label htmlFor="price">Regular Price (₹)</Label>
                       <Input
                         id="price"
                         type="number"
@@ -202,10 +194,31 @@ const AddProducts = () => {
                         {...register("price", { valueAsNumber: true })}
                       />
                       {errors.price && (
-                        <p className="text-sm text-destructive">
-                          {errors.price.message}
-                        </p>
+                        <p className="text-sm text-destructive">{errors.price.message}</p>
                       )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="discountedPrice" className="flex items-center gap-1">
+                            Discounted Price (₹) 
+                            <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                        </Label>
+                        <div className="relative">
+                            <Input
+                                id="discountedPrice"
+                                type="number"
+                                placeholder="0.00"
+                                className="pl-9"
+                                // ✅ FIXED: Registering correct name
+                                {...register("discountedPrice", { valueAsNumber: true })}
+                            />
+                            <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        </div>
+                        {errors.discountedPrice && (
+                            <p className="text-sm text-destructive">
+                            {errors.discountedPrice.message}
+                            </p>
+                        )}
                     </div>
                   </div>
 
@@ -218,9 +231,7 @@ const AddProducts = () => {
                       {...register("description")}
                     />
                     {errors.description && (
-                      <p className="text-sm text-destructive">
-                        {errors.description.message}
-                      </p>
+                      <p className="text-sm text-destructive">{errors.description.message}</p>
                     )}
                   </div>
                 </CardContent>
@@ -248,24 +259,19 @@ const AddProducts = () => {
                     <Plus className="size-4" /> Add Variant
                   </Button>
                 </CardHeader>
-                
                 <Separator />
-
                 <CardContent className="pt-6 space-y-6">
                   {variants.length === 0 ? (
                     <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/20">
                       <Layers className="size-10 mx-auto mb-3 opacity-50" />
                       <p>No variants added yet.</p>
-                      <p className="text-sm">Click "Add Variant" to start.</p>
+                      <p className="text-sm">Click &apos;Add Variant&apos; to start.</p>
                     </div>
                   ) : (
                     variants.map((variant, index) => {
                       const productName = watch("name");
                       return (
-                        <div
-                          key={index}
-                          className="relative group border rounded-xl p-5 bg-card shadow-sm space-y-5 transition-all hover:border-primary/50"
-                        >
+                        <div key={index} className="relative group border rounded-xl p-5 bg-card shadow-sm space-y-5 transition-all hover:border-primary/50">
                           <div className="flex justify-between items-start">
                             <h4 className="font-medium flex items-center gap-2 text-sm text-muted-foreground">
                               <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
@@ -273,46 +279,19 @@ const AddProducts = () => {
                               </span>
                               Variant Configuration
                             </h4>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-destructive h-8 w-8"
-                              onClick={() => removeVariant(index)}
-                            >
+                            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8" onClick={() => removeVariant(index)}>
                               <Trash2 className="size-4" />
                             </Button>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label className="text-xs uppercase text-muted-foreground font-bold">
-                                Color Name
-                              </Label>
-                              <Input
-                                placeholder="e.g. Midnight Blue"
-                                value={variant.color}
-                                onChange={(e) =>
-                                  updateVariant(index, "color", e.target.value)
-                                }
-                              />
+                              <Label className="text-xs uppercase text-muted-foreground font-bold">Color Name</Label>
+                              <Input placeholder="e.g. Midnight Blue" value={variant.color} onChange={(e) => updateVariant(index, "color", e.target.value)} />
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-xs uppercase text-muted-foreground font-bold">
-                                Stock Quantity
-                              </Label>
-                              <Input
-                                type="number"
-                                placeholder="0"
-                                value={variant.stock}
-                                onChange={(e) =>
-                                  updateVariant(
-                                    index,
-                                    "stock",
-                                    Number(e.target.value)
-                                  )
-                                }
-                              />
+                              <Label className="text-xs uppercase text-muted-foreground font-bold">Stock Quantity</Label>
+                              <Input type="number" placeholder="0" value={variant.stock} onChange={(e) => updateVariant(index, "stock", Number(e.target.value))} />
                             </div>
                           </div>
 
@@ -320,42 +299,25 @@ const AddProducts = () => {
                             <Label className="flex items-center gap-2 text-xs uppercase text-muted-foreground font-bold">
                               <ImageIcon className="size-3" /> Variant Images
                             </Label>
-                            
                             <div className="flex flex-wrap gap-4 items-end">
                                 <div className="flex-1 min-w-[200px]">
                                     <ImageUploader
-                                    folder={
-                                        productName && variant.color
-                                        ? buildImageFolder(productName, variant.color)
-                                        : "/watchera/drafts"
-                                    }
-                                    onUpload={(img) =>
-                                        updateVariant(index, "images", [
-                                        ...variant.images,
-                                        img,
-                                        ])
-                                    }
+                                    folder={productName && variant.color ? buildImageFolder(productName, variant.color) : "/watchera/drafts"}
+                                    onUpload={(img) => updateVariant(index, "images", [...variant.images, img])}
                                     />
                                 </div>
-                                
                                 {variant.images.length > 0 && (
                                     <div className="flex gap-2 overflow-x-auto pb-2 max-w-full">
                                         {variant.images.map((img) => (
                                         <div key={img.fileId} className="relative shrink-0">
-                                            <img
-                                            src={img.url}
-                                            alt="Preview"
-                                            className="h-16 w-16 rounded-md object-cover border bg-background"
-                                            />
+                                            <img src={img.url} alt="Preview" className="h-16 w-16 rounded-md object-cover border bg-background" />
                                         </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
                             {!productName || !variant.color ? (
-                                <p className="text-[10px] text-amber-500 font-medium">
-                                    * Enter Product Name and Variant Color to enable upload
-                                </p>
+                                <p className="text-[10px] text-amber-500 font-medium">* Enter Product Name and Variant Color to enable upload</p>
                             ) : null}
                           </div>
                         </div>
@@ -369,9 +331,7 @@ const AddProducts = () => {
             {/* RIGHT COLUMN: ACTIONS & SUMMARY */}
             <div className="space-y-6">
               <Card className="sticky top-6">
-                <CardHeader>
-                  <CardTitle className="text-lg">Publish</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-lg">Publish</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-sm text-muted-foreground">
                     <div className="flex justify-between py-1">
@@ -380,27 +340,22 @@ const AddProducts = () => {
                     </div>
                     <div className="flex justify-between py-1 border-t mt-2 pt-2">
                         <span>Total Stock</span>
-                        <span className="font-medium text-foreground">
-                            {variants.reduce((acc, curr) => acc + (curr.stock || 0), 0)}
-                        </span>
+                        <span className="font-medium text-foreground">{variants.reduce((acc, curr) => acc + (curr.stock || 0), 0)}</span>
                     </div>
+                    <div className="flex justify-between py-1 border-t mt-2 pt-2">
+                        <span>Price</span>
+                        <span className="font-medium text-foreground">₹{watch("price") || 0}</span>
+                    </div>
+                    {watch("discountedPrice") ? (
+                         <div className="flex justify-between py-1 text-green-600">
+                         <span>Discount Price</span>
+                         <span className="font-medium">₹{watch("discountedPrice")}</span>
+                     </div>
+                    ) : null}
                   </div>
-                  
                   <Separator />
-                  
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {loading ? (
-                        <>
-                        <Spinner className="mr-2 text-primary-foreground" /> Publishing...
-                        </>
-                    ) : (
-                      "Publish Product"
-                    )}
+                  <Button type="submit" disabled={loading} className="w-full" size="lg">
+                    {loading ? <><Spinner className="mr-2 text-primary-foreground" /> Publishing...</> : "Publish Product"}
                   </Button>
                 </CardContent>
               </Card>

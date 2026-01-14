@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { Star, ShoppingBag } from "lucide-react"; // Assuming you have lucide-react (standard with shadcn)
+import { Star, ShoppingBag } from "lucide-react"; 
 import Link from "next/link";
 import { productRating } from "@/utils/productRating";
 
@@ -14,8 +14,10 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const mainImage = product.variants[0]?.images[0]?.url;
   const inStock = product.variants[0]?.stock > 0;
+  
+  // Check if there is a valid discount
+  const hasDiscount = product.discountedPrice && product.discountedPrice < product.price;
 
-  // Format currency
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -26,8 +28,8 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Link href={`/products/${product.uid}`} className="block h-full">
-      {" "}
       <Card className="group relative border-none shadow-none bg-transparent hover:bg-zinc-50/50 transition-colors duration-300 rounded-none">
+        
         {/* Image Section */}
         <CardContent className="p-0 relative overflow-hidden bg-zinc-100/50">
           <AspectRatio ratio={1 / 1.1}>
@@ -46,7 +48,15 @@ export default function ProductCard({ product }: ProductCardProps) {
 
           {/* Floating Badges */}
           <div className="absolute top-3 left-3 flex flex-col gap-2">
-            {/* Example logic for "New" or "Best Seller" - customizable */}
+            
+            {/* Sale Badge */}
+            {hasDiscount && inStock && (
+                <Badge className="bg-red-600 hover:bg-red-600 text-white rounded-sm shadow-sm font-medium text-[10px] tracking-wider uppercase">
+                    Sale
+                </Badge>
+            )}
+
+            {/* Top Rated Badge */}
             {productRating(product) > 4.5 && (
               <Badge
                 variant="secondary"
@@ -55,6 +65,8 @@ export default function ProductCard({ product }: ProductCardProps) {
                 Top Rated
               </Badge>
             )}
+
+            {/* Out of Stock Badge */}
             {!inStock && (
               <Badge
                 variant="destructive"
@@ -65,7 +77,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          {/* Quick Action Button - Appears on Hover */}
+          {/* Quick Action Button */}
           <div className="absolute bottom-4 left-0 right-0 px-4 opacity-0 translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
             <Button
               className="w-full bg-black text-white hover:bg-zinc-800 rounded-sm h-10 tracking-wide uppercase text-xs"
@@ -86,9 +98,23 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
 
           <div className="flex justify-between items-center w-full mt-1">
-            <p className="font-semibold text-zinc-900 text-sm">
-              {formatPrice(product.price)}
-            </p>
+            {/* Price Logic */}
+            <div className="flex items-center gap-2">
+                {hasDiscount ? (
+                    <>
+                        <p className="font-semibold text-zinc-900 text-sm">
+                            {formatPrice(product.discountedPrice!)}
+                        </p>
+                        <p className="text-xs text-zinc-400 line-through decoration-zinc-400">
+                            {formatPrice(product.price)}
+                        </p>
+                    </>
+                ) : (
+                    <p className="font-semibold text-zinc-900 text-sm">
+                        {formatPrice(product.price)}
+                    </p>
+                )}
+            </div>
 
             {/* Rating */}
             <div className="flex items-center gap-1 text-zinc-500">
@@ -100,7 +126,6 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
           </div>
 
-          {/* Variant/Color indicator */}
           <p className="text-xs text-zinc-400 font-light mt-2 capitalize">
             {product.variants.length}{" "}
             {product.variants.length > 1 ? "Styles" : "Style"} Available

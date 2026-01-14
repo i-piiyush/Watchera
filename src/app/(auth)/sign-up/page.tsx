@@ -149,7 +149,7 @@ const SignUp = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden px-3 py-8 w-full   bg-zinc-50 ">
+    <div className="flex h-[90vh] overflow-hidden px-3 py-8 w-full   bg-zinc-50 ">
       <div className=" hidden md:block md:w-[60%] rounded-2xl bg-zinc-900 overflow-hidden relative ">
         <Beams lightColor="#fff700" rotation={30} />
 

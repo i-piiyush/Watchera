@@ -27,8 +27,6 @@ import { ProductReviews } from "@/components/ProductReview";
 import { productRating } from "@/utils/productRating";
 
 
-
-
 const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
   const { uid } = React.use(params);
 
@@ -89,9 +87,6 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
     }
   };
 
- 
-  
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -118,6 +113,12 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
 
   const isOutOfStock = selectedVariant.stock <= 0;
   const currentImages = selectedVariant.images;
+  const hasDiscount = product.discountedPrice && product.discountedPrice < product.price;
+
+  // Calculate % off
+  const discountPercentage = hasDiscount 
+    ? Math.round(((product.price - product.discountedPrice!) / product.price) * 100) 
+    : 0;
 
   return (
     <div className="min-h-screen bg-white text-zinc-950 font-sans animate-in fade-in duration-700">
@@ -133,6 +134,7 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
 
       <div className="container mx-auto px-4 md:px-6 pb-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20">
+          
           {/* LEFT COLUMN: Image Gallery */}
           <div className="lg:col-span-7 flex flex-col gap-4 lg:sticky lg:top-8 lg:self-start h-fit">
             <Carousel setApi={setApi} className="w-full group">
@@ -145,7 +147,7 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
                         alt={`${product.name} - view ${index + 1}`}
                         className="h-full w-full object-contain mix-blend-multiply"
                       />
-                      <div className="absolute top-4 left-4 z-10">
+                      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
                         {isOutOfStock ? (
                           <Badge
                             variant="destructive"
@@ -161,6 +163,13 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
                             In Stock
                           </Badge>
                         )}
+                         
+                         {/* Sale Badge on Image as well */}
+                         {hasDiscount && !isOutOfStock && (
+                            <Badge className="bg-red-600 hover:bg-red-600 text-white rounded-full tracking-wider uppercase text-[10px] w-fit">
+                                Sale
+                            </Badge>
+                         )}
                       </div>
                     </div>
                   </CarouselItem>
@@ -199,6 +208,7 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
 
           {/* RIGHT COLUMN: Details & Reviews */}
           <div className="lg:col-span-5 flex flex-col gap-8 pt-2">
+            
             {/* --- PRODUCT DETAILS --- */}
             <div className="space-y-6">
               <div className="space-y-2">
@@ -207,9 +217,27 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
                 </h1>
 
                 <div className="flex items-center justify-between">
-                  <p className="text-2xl font-medium text-zinc-900">
-                    {formatPrice(product.price)}
-                  </p>
+                  {/* PRICE DISPLAY LOGIC */}
+                  <div className="flex items-center gap-3">
+                    {hasDiscount ? (
+                        <>
+                            <p className="text-2xl font-medium text-zinc-900">
+                                {formatPrice(product.discountedPrice!)}
+                            </p>
+                            <p className="text-lg text-zinc-400 line-through decoration-zinc-400">
+                                {formatPrice(product.price)}
+                            </p>
+                            <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-xs font-semibold">
+                                {discountPercentage}% OFF
+                            </Badge>
+                        </>
+                    ) : (
+                        <p className="text-2xl font-medium text-zinc-900">
+                             {formatPrice(product.price)}
+                        </p>
+                    )}
+                  </div>
+
                   <div className="flex items-center gap-1">
                     <div className="flex text-yellow-500">
                       <Star className="w-4 h-4 fill-current" />

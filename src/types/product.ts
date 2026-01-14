@@ -14,6 +14,7 @@ export type Product = {
   name: string;
   description: string;
   price: number;
+  discountedPrice?: number | null; // ✅ FIXED: Added this
   variants: ProductVariant[];
   ratingSum: number;
   reviewCount: number;

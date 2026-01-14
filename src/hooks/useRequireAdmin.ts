@@ -9,12 +9,20 @@ export const useRequireAdmin = () => {
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return; // ⛔ WAIT
-    if (!loading) {
-      if (!user) router.replace("/login");
-      else if (role !== "admin") router.replace("/products");
+    if (loading) return;
+
+    if (!user) {
+      router.replace("/login");
+      return;
     }
 
-    
+    if (role !== "admin") {
+      router.replace("/products");
+    }
   }, [user, role, loading, router]);
+
+  // ✅ derived value, NOT state
+  const ready = !loading && !!user && role === "admin";
+
+  return { ready };
 };

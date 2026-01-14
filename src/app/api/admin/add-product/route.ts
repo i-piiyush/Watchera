@@ -6,76 +6,45 @@ import { NextResponse } from "next/server";
 
 export const POST = async (req: Request) => {
   try {
-    //fetching tokens
     const authHeader = req.headers.get("authorization");
 
     if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Unauthorized",
-          statusCode: 401,
-        },
+        { success: false, message: "Unauthorized", statusCode: 401 },
         { status: 401 }
       );
     }
 
-    //getting token
     const token = authHeader.split("Bearer ")[1];
-
-    //verifying token and fetching user
     const decoded = await adminAuth.verifyIdToken(token);
     const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
 
-    if (!userSnap.exists) {
+    if (!userSnap.exists || userSnap.data()?.role !== "admin") {
       return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "User record not found",
-          statusCode: 401,
-        },
-        { status: 401 }
+        { success: false, message: "Forbidden", statusCode: 403 },
+        { status: 403 }
       );
     }
 
-    //checking if user is admin
-    if (userSnap.data()?.role !== "admin") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Forbidden",
-          statusCode: 403,
-        },
-        {
-          status: 403,
-        }
-      );
-    }
-
-    //validating body
     const body = await req.json();
     const parsed = createProductSchema.safeParse(body);
+
     if (!parsed.success) {
       return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Invalid request body",
-          statusCode: 400,
-        },
-        {
-          status: 400,
-        }
+        { success: false, message: "Invalid request body", statusCode: 400 },
+        { status: 400 }
       );
     }
 
-    // 3️⃣ Create doc
     const ref = adminDb.collection("products").doc();
 
     const product: Product = {
       uid: ref.id,
       ...parsed.data,
-      avgRating: 0,
+      ratingSum: 0,
       reviewCount: 0,
+      // ✅ FIXED: Correctly assign value or null
+      discountedPrice: parsed.data.discountedPrice ?? null, 
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -89,19 +58,12 @@ export const POST = async (req: Request) => {
         statusCode: 201,
         data: { id: ref.id },
       },
-      {
-        status: 201,
-      }
+      { status: 201 }
     );
   } catch (error) {
     console.error("Add product error:", error);
-
     return NextResponse.json<ApiResponse<null>>(
-      {
-        success: false,
-        message: "Server error",
-        statusCode: 500,
-      },
+      { success: false, message: "Server error", statusCode: 500 },
       { status: 500 }
     );
   }
