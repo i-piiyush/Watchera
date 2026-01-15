@@ -72,6 +72,9 @@ const Navbar = () => {
             variant="ghost"
             size="icon"
             className="relative text-zinc-600 hover:text-black"
+            onClick={()=>{
+              router.replace("/cart")
+            }}
           >
             <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
           </Button>

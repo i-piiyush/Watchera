@@ -1,7 +1,7 @@
-import Navbar from '@/components/Navbar'
+
 import ProductGrid from '@/components/ProductGrid'
 import { Separator } from '@/components/ui/separator'
-import React from 'react'
+
 
 const Products = () => {
   return (

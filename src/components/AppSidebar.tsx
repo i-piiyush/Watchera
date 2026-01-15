@@ -38,7 +38,7 @@ export const items = [
 ];
 export function AppSidebar() {
   return (
-    <Sidebar>
+    <Sidebar className="py-18">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Watchera</SidebarGroupLabel>

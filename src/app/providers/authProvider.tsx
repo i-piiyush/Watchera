@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import axios from "axios";
 import { ApiResponse } from "@/types/apiResponse";
 import { AppUser } from "@/types/user";
+import { mergeCartAfterLogin } from "@/lib/mergeCartAfterLogin";
 
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { setUser, setRole, setLoading, resetAuth } = useAuthStore();
@@ -24,7 +25,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       try {
         const token = await user.getIdToken();
-
         const res = await axios.get<ApiResponse<AppUser | null>>("/api/me", {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -35,8 +35,9 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           resetAuth();
           return;
         }
-
         setRole(res.data.data.role);
+
+        mergeCartAfterLogin()
       } catch (error) {
         resetAuth();
       } finally {
