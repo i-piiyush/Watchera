@@ -22,7 +22,7 @@ export const GET = async (req: Request) => {
         message: "No user found",
         statusCode: 404,
         success: false,
-      });
+      },{status:404});
     }
 
     const userData = snap.data() as AppUser;

@@ -129,13 +129,14 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      // --------------------
+     // --------------------
       // Sync cart to backend
       // --------------------
       syncToBackend: async () => {
         const items = get().items;
-        if (!items.length) return;
-
+        // REMOVE THIS LINE: if (!items.length) return; 
+        
+        // We MUST send empty array if items is empty to clear DB
         const headers = await getAuthHeader();
         await axios.post(`/api/cart`, { items }, { headers });
       },
