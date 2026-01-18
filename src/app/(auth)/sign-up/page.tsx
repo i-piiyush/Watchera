@@ -4,7 +4,6 @@ import { signupSchema } from "@/app/schemas/signUpSchema";
 import Beams from "@/components/Beams";
 import { Spinner } from "@/components/ui/spinner";
 import { auth } from "@/firebase/client";
-
 import { ApiResponse } from "@/types/apiResponse";
 import { AppUser } from "@/types/user";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,62 +12,69 @@ import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  onAuthStateChanged,
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
-
 import Link from "next/link";
-
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+// ✅ Wait until Firebase auth state is updated (so AuthProvider updates Zustand)
+const waitForAuthReady = () =>
+  new Promise<void>((resolve) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        unsub();
+        resolve();
+      }
+    });
+  });
+
 const SignUp = () => {
   const [loading, setLoading] = useState(false);
-
   const router = useRouter();
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
   });
 
-  
-
   const onSubmit = async (data: z.infer<typeof signupSchema>) => {
     try {
       setLoading(true);
 
-      // 1️⃣ Create Firebase auth user
       const result = await createUserWithEmailAndPassword(
         auth,
         data.email,
         data.password
       );
 
-      // 2️⃣ Store name in Firebase Auth profile
       await updateProfile(result.user, {
         displayName: data.name,
       });
 
-      // 3️⃣ Get ID token
       const idToken = await result.user.getIdToken(true);
 
-      // 4️⃣ Sync user with backend
       const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
         idToken,
       });
 
       if (res.status === 200) {
-      
         toast.success("Account created successfully 🎉");
+
+        // ✅ important fix
+        await waitForAuthReady();
+
         router.push("/products");
       } else {
         toast.error("Something went wrong. Please try again.");
       }
     } catch (error) {
-      // 🔴 Firebase Auth errors (signup stage)
+      console.log(error);
+
       if (error instanceof FirebaseError) {
         switch (error.code) {
           case "auth/email-already-in-use":
@@ -86,7 +92,6 @@ const SignUp = () => {
         return;
       }
 
-      // 🔴 Backend / Axios errors (sync-user stage)
       const err = error as AxiosError<ApiResponse<AppUser>>;
       toast.error(
         err.response?.data?.message || "Server error. Please try again later."
@@ -98,29 +103,30 @@ const SignUp = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      // 1️⃣ Configure Google provider
-      const provider = new GoogleAuthProvider();
+      setLoading(true);
 
-      // 2️⃣ Open Google OAuth popup
+      const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
 
-      // 3️⃣ Get Firebase ID token
       const idToken = await result.user.getIdToken();
 
-      // 4️⃣ Sync user with backend
       const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
         idToken,
       });
 
-      // 5️⃣ Success path
       if (res.status === 200) {
+        toast.success("Logged in successfully 🎉");
+
+        // ✅ important fix
+        await waitForAuthReady();
+
         router.push("/products");
       } else {
         toast.error("Something went wrong. Please try again.");
       }
     } catch (error) {
       console.log(error);
-      // 🔴 Firebase popup / auth errors
+
       if (error instanceof FirebaseError) {
         switch (error.code) {
           case "auth/popup-closed-by-user":
@@ -140,11 +146,12 @@ const SignUp = () => {
         return;
       }
 
-      // 🔴 Backend / Axios errors
-      const err = error as AxiosError<ApiResponse<AppUser> >;
+      const err = error as AxiosError<ApiResponse<AppUser>>;
       toast.error(
         err.response?.data?.message || "Server error. Please try again later."
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -169,6 +176,7 @@ const SignUp = () => {
           </div>
         </div>
       </div>
+
       <div className=" tracking-tighter  w-full md:w-[40%] px-4 flex flex-col items-center justify-center gap-7">
         <div className="flex flex-col justify-center gap-2 items-center">
           <h1 className="text-4xl  leading-none font-bold ">Sign Up Account</h1>
@@ -176,13 +184,14 @@ const SignUp = () => {
             Enter your personal details to create an account
           </p>
         </div>
+
         <div className="w-full max-w-80 flex flex-col ">
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="px-4 py-2 bg-zinc-900 text-zinc-50 border cursor-pointer rounded-lg font-semibold hover:bg-zinc-800 transition flex items-center justify-center gap-3"
+            disabled={loading}
+            className="px-4 py-2 bg-zinc-900 text-zinc-50 border cursor-pointer rounded-lg font-semibold hover:bg-zinc-800 transition flex items-center justify-center gap-3 disabled:opacity-60"
           >
-            {/* Google SVG */}
             <svg
               width="20"
               height="20"
@@ -217,11 +226,11 @@ const SignUp = () => {
             or
           </span>
         </div>
+
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex flex-col gap-4 w-full max-w-80"
         >
-          {/* Name */}
           <div className="flex flex-col gap-1">
             <label htmlFor="name">Username</label>
             <input
@@ -236,7 +245,6 @@ const SignUp = () => {
             )}
           </div>
 
-          {/* Email */}
           <div className="flex flex-col gap-1">
             <label htmlFor="email">Email</label>
             <input
@@ -251,7 +259,6 @@ const SignUp = () => {
             )}
           </div>
 
-          {/* Password */}
           <div className="flex flex-col gap-1">
             <label htmlFor="password">Password</label>
             <input

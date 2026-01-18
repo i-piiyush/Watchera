@@ -6,7 +6,14 @@ import { auth } from "@/firebase/client";
 import { useAuthStore } from "@/store/authStore";
 import { signOut } from "firebase/auth";
 import { toast } from "sonner";
-import { ShoppingBag, User, Search, LogOut, UserCircle, LayoutDashboard } from "lucide-react";
+import {
+  ShoppingBag,
+  User,
+  Search,
+  LogOut,
+  UserCircle,
+  LayoutDashboard,
+} from "lucide-react";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -19,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Spinner } from "./ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 const Navbar = () => {
   const { user, loading, role } = useAuthStore();
@@ -36,16 +43,6 @@ const Navbar = () => {
     }
   };
 
-  // ⏳ LOADING STATE: Full Screen Overlay
-  if (loading)
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white">
-        {/* Adjusted size and color for visibility */}
-        <Spinner className="size-8 text-zinc-900" />
-      </div>
-    );
-
-  console.log(role, "  role");
   return (
     <header className="sticky top-0 z-50 w-full border-b border-zinc-100 bg-white/80 backdrop-blur-md">
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
@@ -72,15 +69,23 @@ const Navbar = () => {
             variant="ghost"
             size="icon"
             className="relative text-zinc-600 hover:text-black"
-            onClick={()=>{
-              router.replace("/cart")
-            }}
+            onClick={() => router.replace("/cart")}
           >
             <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
           </Button>
 
           {/* Profile Option */}
-          {user ? (
+          {loading ? (
+            // ✅ Don't block whole app, just show small loader here
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-1 text-zinc-600 hover:text-black"
+              disabled
+            >
+              <Spinner className="size-4" />
+            </Button>
+          ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -100,6 +105,7 @@ const Navbar = () => {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
+
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
@@ -111,13 +117,16 @@ const Navbar = () => {
                     </p>
                   </div>
                 </DropdownMenuLabel>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem onClick={() => router.push("/profile")}>
                   <UserCircle className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
+
                 {role === "admin" && (
                   <>
                     <DropdownMenuItem onClick={() => router.push("/admin")}>
@@ -127,6 +136,7 @@ const Navbar = () => {
                     <DropdownMenuSeparator />
                   </>
                 )}
+
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="text-red-600 focus:text-red-600"

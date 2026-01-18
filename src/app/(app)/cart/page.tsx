@@ -23,6 +23,8 @@ import { useCartStore } from "@/store/cartStore";
 import { CartViewItem } from "@/types/cart";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
+import { useRouter } from "next/navigation";
+import { AppUser } from "@/types/user";
 
 const Cart = () => {
   // Local state for static product data (images, names, prices)
@@ -40,6 +42,7 @@ const Cart = () => {
   } = useCartStore();
 
   const { user, loading } = useAuthStore();
+  const router = useRouter()
 
   // Create unique string that changes ONLY when items are Added/Removed, not on quantity change
   const itemsSignature = items
@@ -77,6 +80,58 @@ const Cart = () => {
     fetchCartDetails();
     // Runs on mount, auth change, or when an item is added/removed (signature change)
   }, [user, loading, itemsSignature]); 
+
+  // -----------------------------
+  // Checkout 
+  // -----------------------------
+
+ const checkout = async () => {
+  // 1) Not logged in
+  if (!user) {
+    toast.info("Please login before checking out!");
+    router.replace("/login");
+    return;
+  }
+
+  try {
+    // 2) Token
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      toast.error("Session expired, please login again");
+      router.replace("/login");
+      return;
+    }
+
+    // 3) Fetch latest user status from DB
+    const res = await axios.get<ApiResponse<AppUser>>("/api/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const dbUser = res.data.data;
+
+    if (!dbUser) {
+      toast.error("User not found");
+      router.replace("/login");
+      return;
+    }
+
+    // 4) Check email + phone verification
+    const emailOk = dbUser.emailVerified === true;
+    const phoneOk = dbUser.phoneVerified === true;
+
+    if (emailOk && phoneOk) {
+      router.replace("/checkout");
+      return;
+    }
+    // 5) Not verified -> go to verify flow
+    router.replace("/cart/verify");
+  } catch (error) {
+    const err = error as AxiosError<ApiResponse<null>>;
+    toast.error(err.response?.data?.message || "Unable to verify user status");
+  }
+};
+
+
 
   // -----------------------------
   // Merge Static Data (Server) with Live Quantity (Local)
@@ -343,7 +398,7 @@ const Cart = () => {
               </div>
 
               {/* Checkout */}
-              <Button className="w-full h-14 bg-black text-white hover:bg-zinc-800 rounded-none uppercase tracking-[0.2em] text-xs font-medium group transition-all duration-500 relative overflow-hidden">
+              <Button className="w-full h-14 bg-black text-white hover:bg-zinc-800 rounded-none uppercase tracking-[0.2em] text-xs font-medium group transition-all duration-500 relative overflow-hidden" onClick={checkout}>
                 <span className="relative z-10 flex items-center gap-2">
                   Checkout Securely{" "}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

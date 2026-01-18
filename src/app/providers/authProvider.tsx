@@ -12,41 +12,42 @@ import { mergeCartAfterLogin } from "@/lib/mergeCartAfterLogin";
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { setUser, setRole, setLoading, resetAuth } = useAuthStore();
 
-  useEffect(() => {
-    setLoading(true);
+ useEffect(() => {
+  setLoading(true);
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
+  const unsub = onAuthStateChanged(auth, async (user) => {
+    try {
       if (!user) {
         resetAuth();
+         setLoading(false);
         return;
       }
 
       setUser(user);
 
-      try {
-        const token = await user.getIdToken();
-        const res = await axios.get<ApiResponse<AppUser | null>>("/api/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      const token = await user.getIdToken();
+      const res = await axios.get<ApiResponse<AppUser | null>>("/api/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-        if (!res.data.data) {
-          resetAuth();
-          return;
-        }
-        setRole(res.data.data.role);
-
-        mergeCartAfterLogin()
-      } catch (error) {
+      if (!res.data.data) {
         resetAuth();
-      } finally {
-        setLoading(false);
+        return;
       }
-    });
 
-    return () => unsub();
-  }, []);
+      setRole(res.data.data.role);
+
+      await mergeCartAfterLogin();
+    } catch (error) {
+      resetAuth();
+    } finally {
+      setLoading(false); // ✅ ALWAYS
+    }
+  });
+
+  return () => unsub();
+}, []);
+
 
   return <>{children}</>;
 };

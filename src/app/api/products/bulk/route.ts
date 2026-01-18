@@ -20,6 +20,7 @@ export const GET = async (req: Request) => {
     const decoded = await adminAuth.verifyIdToken(token);
 
     // 2) Get cart doc
+    
     const cartSnap = await adminDb.collection("carts").doc(decoded.uid).get();
 
     // cart empty is valid

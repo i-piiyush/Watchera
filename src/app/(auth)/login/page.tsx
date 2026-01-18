@@ -11,6 +11,7 @@ import axios, { AxiosError } from "axios";
 import { FirebaseError } from "firebase/app";
 import {
   GoogleAuthProvider,
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
@@ -21,6 +22,17 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import z from "zod";
 
+// ✅ Wait until Firebase auth state is updated (so AuthProvider updates Zustand)
+const waitForAuthReady = () =>
+  new Promise<void>((resolve) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        unsub();
+        resolve();
+      }
+    });
+  });
+
 const Login = () => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -29,43 +41,48 @@ const Login = () => {
     resolver: zodResolver(loginSchema),
   });
 
- 
-
   const handleGoogleLogin = async () => {
     try {
-      // 1️⃣ Configure Google provider
-      const provider = new GoogleAuthProvider();
+      setLoading(true);
 
-      // 2️⃣ Open Google OAuth popup (can fail / be cancelled)
+      const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
 
-      // 3️⃣ Always get Firebase ID token (proof of auth)
       const idToken = await result.user.getIdToken();
 
-      // 4️⃣ Call backend to sync Firebase user → App user
       const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
-        idToken, // payload key MUST match backend
+        idToken,
       });
 
-     
-
-
-
-      // 5️⃣ Use HTTP status as source of truth (not body)
       if (res.status === 200) {
-     
+        toast.success("Logged in successfully 🎉");
+
+        // ✅ important fix
+        await waitForAuthReady();
+
         router.push("/products");
       }
     } catch (error) {
-      // 6️⃣ Strongly typed axios error handling
-      const err = error as AxiosError<ApiResponse<AppUser>>;
+      console.log(error);
 
-      // Backend-provided message (preferred)
-      if (err.response?.data?.message) {
-        console.error(err.response.data.message);
-      } else {
-        console.error("Login failed or cancelled");
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case "auth/popup-closed-by-user":
+            toast.info("Login cancelled");
+            break;
+          case "auth/popup-blocked":
+            toast.error("Popup blocked. Please allow popups.");
+            break;
+          default:
+            toast.error("Google login failed. Please try again.");
+        }
+        return;
       }
+
+      const err = error as AxiosError<ApiResponse<AppUser>>;
+      toast.error(err.response?.data?.message || "Login failed. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,76 +90,57 @@ const Login = () => {
     try {
       setLoading(true);
 
-      // 1️⃣ Login existing Firebase auth user
       const result = await signInWithEmailAndPassword(
         auth,
         data.email,
         data.password
       );
 
-      // 2️⃣ Get Firebase ID token
       const idToken = await result.user.getIdToken();
 
-      // 3️⃣ Sync user with backend (idempotent)
       const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
         idToken,
       });
-      
+
       if (res.status === 200) {
-      
         toast.success("Logged in successfully 🎉");
+
+        // ✅ important fix
+        await waitForAuthReady();
+
         router.push("/products");
       } else {
         toast.error("Something went wrong. Please try again.");
       }
     } catch (error) {
       console.log(error);
-      // 🔴 Firebase Auth errors (login stage)
+
       if (error instanceof FirebaseError) {
         switch (error.code) {
-          // ❌ Email does not exist
           case "auth/user-not-found":
             toast.error("No account found with this email.");
             break;
-
-          // ❌ Password incorrect
           case "auth/wrong-password":
             toast.error("Invalid email or password.");
             break;
-
-          // ❌ Email format invalid
           case "auth/invalid-email":
             toast.error("Invalid email address.");
             break;
-
-          // ❌ User account disabled by admin
           case "auth/user-disabled":
             toast.error("This account has been disabled.");
             break;
-
-          // ❌ Too many attempts (rate limit)
           case "auth/too-many-requests":
             toast.error("Too many attempts. Please try again later.");
             break;
-
-          // ❌ Missing password / email
           case "auth/missing-password":
             toast.error("Password is required.");
             break;
-
-          case "auth/internal-error":
-            toast.error("Authentication error. Please try again.");
-            break;
-
-          // ❌ Fallback
           default:
             toast.error("Invalid email or password.");
         }
-
         return;
       }
 
-      // 🔴 Backend / Axios errors (sync-user stage)
       const err = error as AxiosError<ApiResponse<AppUser>>;
       toast.error(
         err.response?.data?.message || "Server error. Please try again later."
@@ -179,22 +177,24 @@ const Login = () => {
           </div>
         </div>
       </div>
+
       <div className=" tracking-tighter  w-full md:w-[40%] px-4 flex flex-col items-center justify-center gap-7">
         <div className="flex flex-col justify-center gap-2 items-center">
           <h1 className="text-4xl text-center leading-none font-bold ">
             Sign In to Your Account
           </h1>
           <p className="opacity-70 text-center">
-           Enter your credentials to continue.
+            Enter your credentials to continue.
           </p>
         </div>
+
         <div className="w-full max-w-80 flex flex-col ">
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="px-4 py-2 bg-zinc-900 text-zinc-50 border cursor-pointer rounded-lg font-semibold hover:bg-zinc-800 transition flex items-center justify-center gap-3"
+            disabled={loading}
+            className="px-4 py-2 bg-zinc-900 text-zinc-50 border cursor-pointer rounded-lg font-semibold hover:bg-zinc-800 transition flex items-center justify-center gap-3 disabled:opacity-60"
           >
-            {/* Google SVG */}
             <svg
               width="20"
               height="20"
@@ -229,11 +229,11 @@ const Login = () => {
             or
           </span>
         </div>
+
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex flex-col gap-4 w-full max-w-80"
         >
-          {/* Email */}
           <div className="flex flex-col gap-1">
             <label htmlFor="email">Email</label>
             <input
@@ -248,7 +248,6 @@ const Login = () => {
             )}
           </div>
 
-          {/* Password */}
           <div className="flex flex-col gap-1">
             <label htmlFor="password">Password</label>
             <input
@@ -271,7 +270,7 @@ const Login = () => {
           >
             {loading ? (
               <div className="flex items-center justify-center gap-2">
-               Sign In
+                Sign In
                 <Spinner />
               </div>
             ) : (
@@ -282,7 +281,7 @@ const Login = () => {
 
         <div>
           <p className="text-sm font-medium text-zinc-900/40">
-           Don’t have an account?{" "}
+            Don’t have an account?{" "}
             <Link
               href="/sign-up"
               className="text-zinc-900 font-semibold hover:underline"
