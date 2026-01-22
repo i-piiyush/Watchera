@@ -22,21 +22,12 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-
-// ✅ Wait until Firebase auth state is updated (so AuthProvider updates Zustand)
-const waitForAuthReady = () =>
-  new Promise<void>((resolve) => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) {
-        unsub();
-        resolve();
-      }
-    });
-  });
+import { useAuthStore } from "@/store/authStore";
 
 const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { setUser, setRole, setLoading: setAuthLoading } = useAuthStore();
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -49,30 +40,33 @@ const SignUp = () => {
       const result = await createUserWithEmailAndPassword(
         auth,
         data.email,
-        data.password
+        data.password,
       );
-
+      // ✅ FORCE update zustand instantly
+      setAuthLoading(true);
+      setUser(result.user);
       await updateProfile(result.user, {
         displayName: data.name,
       });
 
       const idToken = await result.user.getIdToken(true);
 
-      const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
-        idToken,
-      });
+      const res = await axios.post<ApiResponse<AppUser>>(
+        "/api/auth/sync-user",
+        {
+          idToken,
+        },
+      );
 
       if (res.status === 200) {
         toast.success("Account created successfully 🎉");
-
-        // ✅ important fix
-        await waitForAuthReady();
 
         router.push("/products");
       } else {
         toast.error("Something went wrong. Please try again.");
       }
     } catch (error) {
+      setAuthLoading(false);
       console.log(error);
 
       if (error instanceof FirebaseError) {
@@ -94,7 +88,7 @@ const SignUp = () => {
 
       const err = error as AxiosError<ApiResponse<AppUser>>;
       toast.error(
-        err.response?.data?.message || "Server error. Please try again later."
+        err.response?.data?.message || "Server error. Please try again later.",
       );
     } finally {
       setLoading(false);
@@ -110,15 +104,15 @@ const SignUp = () => {
 
       const idToken = await result.user.getIdToken();
 
-      const res = await axios.post<ApiResponse<AppUser>>("/api/auth/sync-user", {
-        idToken,
-      });
+      const res = await axios.post<ApiResponse<AppUser>>(
+        "/api/auth/sync-user",
+        {
+          idToken,
+        },
+      );
 
       if (res.status === 200) {
         toast.success("Logged in successfully 🎉");
-
-        // ✅ important fix
-        await waitForAuthReady();
 
         router.push("/products");
       } else {
@@ -137,7 +131,7 @@ const SignUp = () => {
             break;
           case "auth/account-exists-with-different-credential":
             toast.error(
-              "Account exists with another sign-in method. Try email login."
+              "Account exists with another sign-in method. Try email login.",
             );
             break;
           default:
@@ -148,7 +142,7 @@ const SignUp = () => {
 
       const err = error as AxiosError<ApiResponse<AppUser>>;
       toast.error(
-        err.response?.data?.message || "Server error. Please try again later."
+        err.response?.data?.message || "Server error. Please try again later.",
       );
     } finally {
       setLoading(false);
