@@ -23,6 +23,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { VerifyForm, verifySchema } from "@/app/schemas/verifyUserSchema";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 // -------------------------
 // Steps config
@@ -45,6 +46,8 @@ export default function VerifyPage() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const router = useRouter()
 
   // -------------------------
   // React Hook Form
@@ -216,6 +219,11 @@ export default function VerifyPage() {
           otp: watch("otp"),
           phone: watch("phone"),
         });
+
+        router.replace("/checkout")
+
+
+        
 
         return;
       }

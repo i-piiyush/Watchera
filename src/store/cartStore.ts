@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axios from "axios";
 import { auth } from "@/firebase/client";
+import { addToGuestCart } from "@/lib/guestCart"; 
 
 // --------------------
 // Types
@@ -23,8 +24,8 @@ type CartState = {
   decreaseQty: (productId: string, variantColor: string) => void;
 
   clearCart: () => void;
-  loadCart: (userId?: string) => Promise<void>;
-  syncToBackend: (userId?: string) => Promise<void>;
+  loadCart: () => Promise<void>;
+  syncToBackend: () => Promise<void>;
 };
 
 const getAuthHeader = async () => {
@@ -43,7 +44,7 @@ export const useCartStore = create<CartState>()(
       loading: false,
 
       // --------------------
-      // Add item
+      // Add item (Updated)
       // --------------------
       addItem: (item) => {
         set((state) => {
@@ -63,13 +64,19 @@ export const useCartStore = create<CartState>()(
               ),
             };
           }
-
           return { items: [...state.items, item] };
         });
+
+        // 🔥 AUTO-SYNC LOGIC
+        if (auth.currentUser) {
+           get().syncToBackend();
+        } else {
+           addToGuestCart(item);
+        }
       },
 
       // --------------------
-      // Remove item
+      // Remove item (Updated)
       // --------------------
       removeItem: (productId, variantColor) => {
         set((state) => ({
@@ -78,10 +85,16 @@ export const useCartStore = create<CartState>()(
               !(i.productId === productId && i.variantColor === variantColor)
           ),
         }));
+
+        // 🔥 AUTO-SYNC LOGIC
+        if (auth.currentUser) {
+           get().syncToBackend();
+        } 
+        // Optional: remove from guest cart if needed
       },
 
       // --------------------
-      // Increase quantity
+      // Increase Qty (Updated)
       // --------------------
       increaseQty: (productId, variantColor) => {
         set((state) => ({
@@ -91,10 +104,15 @@ export const useCartStore = create<CartState>()(
               : i
           ),
         }));
+
+        // 🔥 AUTO-SYNC LOGIC
+        if (auth.currentUser) {
+           get().syncToBackend();
+        }
       },
 
       // --------------------
-      // Decrease quantity
+      // Decrease Qty (Updated)
       // --------------------
       decreaseQty: (productId, variantColor) => {
         set((state) => ({
@@ -106,49 +124,43 @@ export const useCartStore = create<CartState>()(
             )
             .filter((i) => i.quantity > 0),
         }));
+
+        // 🔥 AUTO-SYNC LOGIC
+        if (auth.currentUser) {
+           get().syncToBackend();
+        }
       },
 
-      // --------------------
-      // Clear cart
-      // --------------------
       clearCart: () => {
         set({ items: [] });
       },
 
-      // --------------------
-      // Load cart (after login / refresh)
-      // --------------------
       loadCart: async () => {
         set({ loading: true });
         try {
           const headers = await getAuthHeader();
           const res = await axios.get(`/api/cart`, { headers });
-          set({ items: res.data.items || [] });
+          set({ items: res.data.data?.items || [] }); // Fixed: added .data?.items
+        } catch(e) {
+            console.log("Load cart error", e)
         } finally {
           set({ loading: false });
         }
       },
 
-     // --------------------
-      // Sync cart to backend
-      // --------------------
       syncToBackend: async () => {
         const items = get().items;
-        // REMOVE THIS LINE: if (!items.length) return; 
-        
-        // We MUST send empty array if items is empty to clear DB
-        const headers = await getAuthHeader();
-        await axios.post(`/api/cart`, { items }, { headers });
+        try {
+            const headers = await getAuthHeader();
+            await axios.post(`/api/cart`, { items }, { headers });
+        } catch(e) {
+            console.error("Sync failed", e);
+        }
       },
     }),
     {
-      name: "cart-storage", // localStorage key
-      partialize: (state) => ({ items: state.items }), // persist only items
+      name: "cart-storage",
+      partialize: (state) => ({ items: state.items }),
     }
   )
 );
-
-
-
-
-

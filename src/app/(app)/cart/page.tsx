@@ -30,7 +30,9 @@ const Cart = () => {
   // Local state for static product data (images, names, prices)
   const [productDetails, setProductDetails] = useState<CartViewItem[]>([]);
   const [coupon, setCoupon] = useState("");
-  const [loadingCart, setLoadingCart] = useState(true);
+  
+  // Local loading state for fetching details
+  const [isFetchingDetails, setIsFetchingDetails] = useState(true);
 
   // Zustand Stores
   const {
@@ -41,26 +43,30 @@ const Cart = () => {
     syncToBackend,
   } = useCartStore();
 
-  const { user, loading } = useAuthStore();
-  const router = useRouter()
+  const { user, loading: authLoading } = useAuthStore();
+  const router = useRouter();
 
-  // Create unique string that changes ONLY when items are Added/Removed, not on quantity change
-  const itemsSignature = items
-    .map((i) => `${i.productId}-${i.variantColor}`)
-    .sort()
-    .join("|");
+  // Create unique string that changes ONLY when items are Added/Removed
+  // We use this to prevent re-fetching when just quantity changes
+  const itemsSignature = useMemo(() => {
+    return items
+      .map((i) => `${i.productId}-${i.variantColor}`)
+      .sort()
+      .join("|");
+  }, [items]);
 
   // -----------------------------
   // Fetch Product Details (Name, Image)
   // -----------------------------
   useEffect(() => {
     const fetchCartDetails = async () => {
-      try {
-        if (loading) return;
-        setLoadingCart(true);
+      // If auth is still loading, wait.
+      if (authLoading) return;
 
-        // We rely purely on Local State 'items' for the list of IDs.
-        // We DO NOT fetch the list from server here to avoid race conditions.
+      setIsFetchingDetails(true);
+
+      try {
+        // If we have items in Zustand/Local Storage, fetch their details
         if (items.length > 0) {
           const res = await axios.post<ApiResponse<CartViewItem[]>>(
             "/api/cart/items",
@@ -71,67 +77,17 @@ const Cart = () => {
           setProductDetails([]);
         }
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching cart details:", error);
       } finally {
-        setLoadingCart(false);
+        setIsFetchingDetails(false);
       }
     };
 
     fetchCartDetails();
-    // Runs on mount, auth change, or when an item is added/removed (signature change)
-  }, [user, loading, itemsSignature]); 
-
-  // -----------------------------
-  // Checkout 
-  // -----------------------------
-
- const checkout = async () => {
-  // 1) Not logged in
-  if (!user) {
-    toast.info("Please login before checking out!");
-    router.replace("/login");
-    return;
-  }
-
-  try {
-    // 2) Token
-    const token = await auth.currentUser?.getIdToken();
-    if (!token) {
-      toast.error("Session expired, please login again");
-      router.replace("/login");
-      return;
-    }
-
-    // 3) Fetch latest user status from DB
-    const res = await axios.get<ApiResponse<AppUser>>("/api/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const dbUser = res.data.data;
-
-    if (!dbUser) {
-      toast.error("User not found");
-      router.replace("/login");
-      return;
-    }
-
-    // 4) Check email + phone verification
-    const emailOk = dbUser.emailVerified === true;
-    const phoneOk = dbUser.phoneVerified === true;
-
-    if (emailOk && phoneOk) {
-      router.replace("/checkout");
-      return;
-    }
-    // 5) Not verified -> go to verify flow
-    router.replace("/cart/verify");
-  } catch (error) {
-    const err = error as AxiosError<ApiResponse<null>>;
-    toast.error(err.response?.data?.message || "Unable to verify user status");
-  }
-};
-
-
+    
+    // 🔥 CRITICAL FIX: We only re-run this if 'itemsSignature' changes (Add/Remove).
+    // We do NOT include 'items' here, so quantity changes don't trigger a reload.
+  }, [authLoading, itemsSignature]); 
 
   // -----------------------------
   // Merge Static Data (Server) with Live Quantity (Local)
@@ -139,23 +95,68 @@ const Cart = () => {
   const displayItems = useMemo(() => {
     return productDetails
       .map((detail) => {
-        // Match detail with live store item to get current quantity
         const liveItem = items.find(
           (i) =>
             i.productId === detail.productId &&
             i.variantColor === detail.variantColor
         );
 
+        // Instant Update: We take quantity from 'liveItem' (Zustand) 
+        // which updates immediately on click.
         if (liveItem) {
           return { ...detail, quantity: liveItem.quantity };
         }
         return null;
       })
       .filter((item): item is CartViewItem => item !== null);
-  }, [productDetails, items]); // Updates instantly when quantity changes
+  }, [productDetails, items]); // 'items' is here, so the UI updates instantly
 
   // -----------------------------
-  // Helpers
+  // Checkout Logic
+  // -----------------------------
+  const checkout = async () => {
+    if (!user) {
+      toast.info("Please login before checking out!");
+      router.replace("/login");
+      return;
+    }
+
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        toast.error("Session expired, please login again");
+        router.replace("/login");
+        return;
+      }
+
+      const res = await axios.get<ApiResponse<AppUser>>("/api/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const dbUser = res.data.data;
+
+      if (!dbUser) {
+        toast.error("User not found");
+        router.replace("/login");
+        return;
+      }
+
+      const emailOk = dbUser.emailVerified === true;
+      const phoneOk = dbUser.phoneVerified === true;
+
+      if (emailOk && phoneOk) {
+        router.replace("/checkout");
+        return;
+      }
+      router.replace("/cart/verify");
+    } catch (error) {
+      const err = error as AxiosError<ApiResponse<null>>;
+      toast.error(err.response?.data?.message || "Unable to verify user status");
+    }
+  };
+
+  // -----------------------------
+  // Helpers & Actions
   // -----------------------------
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -165,48 +166,55 @@ const Cart = () => {
     }).format(amount);
   };
 
-  // -----------------------------
-  // Actions (Optimistic UI + Background Sync)
-  // -----------------------------
-  const handleIncrease = async (productId: string, variantColor: string) => {
+  // 🔥 These actions update Zustand instantly.
+  // The 'syncToBackend' happens asynchronously and doesn't block UI.
+  const handleIncrease = (productId: string, variantColor: string) => {
     increaseQty(productId, variantColor);
-    if (user) {
-      try { await syncToBackend(); } catch (e) { console.error(e); }
-    }
+    // Background sync - no await needed for UI
+    if (user) syncToBackend().catch(console.error);
   };
 
-  const handleDecrease = async (productId: string, variantColor: string) => {
+  const handleDecrease = (productId: string, variantColor: string) => {
     decreaseQty(productId, variantColor);
-    if (user) {
-      try { await syncToBackend(); } catch (e) { console.error(e); }
-    }
+    if (user) syncToBackend().catch(console.error);
   };
 
-  const handleRemove = async (productId: string, variantColor: string) => {
+  const handleRemove = (productId: string, variantColor: string) => {
     removeItem(productId, variantColor);
-    if (user) {
-      try { await syncToBackend(); } catch (e) { console.error(e); }
-    }
+    if (user) syncToBackend().catch(console.error);
   };
 
   // -----------------------------
-  // Price Calculations
+  // Calculations
   // -----------------------------
   const subtotal = displayItems.reduce(
     (acc, item) => acc + item.priceSnapshot * item.quantity,
     0
   );
-
   const shipping = 0;
   const total = subtotal + shipping;
   const tax = subtotal * 0.18;
 
   // -----------------------------
-  // Empty State UI
+  // 1. LOADING STATE (Auth OR Data Fetching)
   // -----------------------------
-  if (!loadingCart && displayItems.length === 0) {
+  // Only show full page spinner on initial load or if structure changes
+  const isPageLoading = authLoading || isFetchingDetails;
+
+  if (isPageLoading && displayItems.length === 0) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center space-y-4 bg-white">
+      <div className="min-h-[80vh] flex items-center justify-center bg-white">
+        <Spinner className="size-8 text-zinc-900" />
+      </div>
+    );
+  }
+
+  // -----------------------------
+  // 2. EMPTY STATE
+  // -----------------------------
+  if (!isPageLoading && displayItems.length === 0) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center space-y-4 bg-white animate-in fade-in duration-500">
         <div className="p-6 rounded-full bg-zinc-50 border border-zinc-100">
           <ShoppingBag className="h-10 w-10 text-zinc-300" strokeWidth={1} />
         </div>
@@ -224,21 +232,10 @@ const Cart = () => {
   }
 
   // -----------------------------
-  // Loading State UI
-  // -----------------------------
-  if (loadingCart) {
-    return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <Spinner className="size-6 text-black" />
-      </div>
-    );
-  }
-
-  // -----------------------------
-  // Main Render
+  // 3. MAIN CART RENDER
   // -----------------------------
   return (
-    <div className="min-h-screen bg-white text-zinc-950 font-sans selection:bg-black selection:text-white">
+    <div className="min-h-screen bg-white text-zinc-950 font-sans selection:bg-black selection:text-white animate-in fade-in slide-in-from-bottom-4 duration-700">
       <main className="container mx-auto px-4 md:px-6 py-12 lg:py-20">
         {/* Header */}
         <div className="flex flex-col gap-2 mb-12">
@@ -255,7 +252,6 @@ const Cart = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24 items-start">
           {/* LEFT: ITEMS LIST */}
           <div className="lg:col-span-7 space-y-0">
-            {/* Table Header */}
             <div className="hidden md:grid grid-cols-12 text-[10px] uppercase tracking-widest text-zinc-400 border-b border-zinc-100 pb-4 mb-4">
               <div className="col-span-6">Product</div>
               <div className="col-span-3 text-center">Quantity</div>
@@ -281,11 +277,9 @@ const Cart = () => {
                     <h3 className="font-medium text-base text-zinc-900 font-serif leading-none">
                       {item.name}
                     </h3>
-
                     <p className="text-xs text-zinc-500 font-light tracking-wide uppercase">
                       {item.variantColor}
                     </p>
-
                     <p className="md:hidden text-sm font-mono text-zinc-900 pt-1">
                       {formatPrice(item.priceSnapshot)}
                     </p>
@@ -296,29 +290,21 @@ const Cart = () => {
                 <div className="col-span-6 md:col-span-3 flex md:justify-center items-center gap-4 mt-4 md:mt-0">
                   <div className="flex items-center border border-zinc-200">
                     <button
-                      onClick={() =>
-                        handleDecrease(item.productId, item.variantColor)
-                      }
+                      onClick={() => handleDecrease(item.productId, item.variantColor)}
                       className="h-8 w-8 flex items-center justify-center hover:bg-zinc-100 transition-colors"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
-
                     <span className="w-8 text-center text-sm font-mono">
                       {item.quantity}
                     </span>
-
                     <button
-                      onClick={() =>
-                        handleIncrease(item.productId, item.variantColor)
-                      }
+                      onClick={() => handleIncrease(item.productId, item.variantColor)}
                       className="h-8 w-8 flex items-center justify-center hover:bg-zinc-100 transition-colors"
                     >
                       <Plus className="h-3 w-3" />
                     </button>
                   </div>
-
-                  {/* Remove Button (Mobile) */}
                   <button
                     onClick={() => handleRemove(item.productId, item.variantColor)}
                     className="md:hidden text-xs text-red-500 uppercase tracking-wider"
@@ -332,7 +318,6 @@ const Cart = () => {
                   <p className="text-sm font-mono text-zinc-900">
                     {formatPrice(item.priceSnapshot * item.quantity)}
                   </p>
-
                   <button
                     onClick={() => handleRemove(item.productId, item.variantColor)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-zinc-400 hover:text-red-600"
@@ -359,14 +344,12 @@ const Cart = () => {
                     {formatPrice(subtotal)}
                   </span>
                 </div>
-
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500">Shipping Estimate</span>
                   <span className="font-mono text-zinc-900">
                     {shipping === 0 ? "Free" : formatPrice(shipping)}
                   </span>
                 </div>
-
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500">Tax (18%)</span>
                   <span className="font-mono text-zinc-900">
@@ -398,7 +381,10 @@ const Cart = () => {
               </div>
 
               {/* Checkout */}
-              <Button className="w-full h-14 bg-black text-white hover:bg-zinc-800 rounded-none uppercase tracking-[0.2em] text-xs font-medium group transition-all duration-500 relative overflow-hidden" onClick={checkout}>
+              <Button
+                className="w-full h-14 bg-black text-white hover:bg-zinc-800 rounded-none uppercase tracking-[0.2em] text-xs font-medium group transition-all duration-500 relative overflow-hidden"
+                onClick={checkout}
+              >
                 <span className="relative z-10 flex items-center gap-2">
                   Checkout Securely{" "}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
