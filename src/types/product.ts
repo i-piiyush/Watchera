@@ -4,20 +4,25 @@ export type ProductImage = {
 };
 
 export type ProductVariant = {
-  color: string;
+  color: string;            // "black", "silver" etc
   images: ProductImage[];
   stock: number;
 };
 
 export type Product = {
   uid: string;
+
   name: string;
   description: string;
-  price: number;
-  discountedPrice?: number | null; // ✅ FIXED: Added this
+
+  price: number;            // base price
+  discountedPrice?: number; // OPTIONAL => only exists if discount is active
+
   variants: ProductVariant[];
+
   ratingSum: number;
   reviewCount: number;
+
   createdAt: number;
   updatedAt: number;
 };
