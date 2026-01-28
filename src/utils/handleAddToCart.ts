@@ -39,5 +39,5 @@ export const handleAddToCart = ({
 
 
   addItem(cartItem);
-  console.log("🛒 Cart updated with:", cartItem);
+  
 };

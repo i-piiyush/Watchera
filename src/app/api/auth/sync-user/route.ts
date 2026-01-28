@@ -1,79 +1,88 @@
+import { syncUserSchema } from "@/app/schemas/authSchema";
 import { adminAuth, adminDb } from "@/firebase/admin";
 import { ApiResponse } from "@/types/apiResponse";
-import { NextResponse } from "next/server";
 import { AppUser } from "@/types/user";
-import { syncUserSchema } from "@/app/schemas/authSchema";
+import { NextResponse } from "next/server";
+
 
 export const POST = async (req: Request) => {
   try {
-    // 1️⃣ Parse & validate request body
-    const body: unknown = await req.json();
-
+    const body = await req.json();
     const parsed = syncUserSchema.safeParse(body);
+
     if (!parsed.success) {
       return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Invalid request body",
-          statusCode: 400,
-        },
+        { success: false, message: "Invalid payload", statusCode: 400 },
         { status: 400 }
       );
     }
-    const { idToken } = parsed.data;
 
-    // 2️⃣ Verify Firebase ID token (throws if invalid/expired)
+    const { idToken, name } = parsed.data;
+
     const decoded = await adminAuth.verifyIdToken(idToken);
-    const avatar = decoded.picture ? decoded.picture : "";
+    const { uid, email, picture, email_verified, name: tokenName } = decoded;
 
-    // 3️⃣ Reference user document (UID = doc ID)
-    const ref = adminDb.collection("users").doc(decoded.uid);
-    const snap = await ref.get();
+    // 🔐 FINAL NAME RESOLUTION (NO EMPTY STRINGS)
+    const finalName =
+      name?.trim() ||
+      tokenName?.trim() ||
+      "Anonymous";
 
-    // 4️⃣ Build strongly-typed app user object
+    const userRef = adminDb.collection("users").doc(uid);
+    const snap = await userRef.get();
+
+    if (snap.exists) {
+      const existing = snap.data() as AppUser;
+
+      // 🔥 Self-heal bad legacy data
+      if (!existing.name || existing.name === "Anonymous") {
+        await userRef.update({ name: finalName });
+      }
+
+      return NextResponse.json<ApiResponse<null>>(
+        { success: true, message: "User synced", statusCode: 200 },
+        { status: 200 }
+      );
+    }
+
+    // 🛑 Prevent duplicate email accounts
+    if (email) {
+      const emailSnap = await adminDb
+        .collection("users")
+        .where("email", "==", email)
+        .limit(1)
+        .get();
+
+      if (!emailSnap.empty) {
+        return NextResponse.json<ApiResponse<null>>(
+          { success: true, message: "Account already exists", statusCode: 200 },
+          { status: 200 }
+        );
+      }
+    }
+
     const userData: AppUser = {
-      uid: decoded.uid,
-      email: decoded.email ?? null,
-      name: decoded.name ?? "",
-      avatar: avatar,
-      emailVerified: decoded.email_verified ?? false,
+      uid,
+      email: email ?? null,
+      name: finalName,
+      avatar: picture ?? "",
+      emailVerified: !!email_verified,
       role: "user",
       phoneVerified: false,
       createdAt: Date.now(),
     };
 
-    if (!snap.exists) {
-      await ref.set(userData);
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: true,
-          message: "User synced successfully",
-          statusCode: 200,
-        },
-        { status: 200 }
-      );
-    }
+    await userRef.set(userData);
 
-    // 6️⃣ Success response (HTTP status = source of truth)
     return NextResponse.json<ApiResponse<null>>(
-      {
-        success: true,
-        message: "User synced successfully",
-        statusCode: 200,
-      },
-      { status: 200 }
+      { success: true, message: "User created", statusCode: 201 },
+      { status: 201 }
     );
-  } catch (error) {
-    console.error("Error while syncing user:", error);
-
-    // 7️⃣ Auth errors vs server errors (basic separation)
+  } catch (err) {
+    console.error("SYNC USER ERROR:", err);
     return NextResponse.json<ApiResponse<null>>(
-      {
-        success: false,
-        message: "Invalid or expired token",
-        statusCode: 401,
-      },
-      { status: 401 }
+      { success: false, message: "Server error", statusCode: 500 },
+      { status: 500 }
     );
   }
 };

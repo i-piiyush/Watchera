@@ -137,6 +137,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
   
 
   const onSubmit = async (data: z.infer<typeof createReviewSchemaFrontend>) => {
+ 
     if (!user) return toast.error("User not logged in");
     
     try {
@@ -153,6 +154,8 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
         // Ideally, refetch reviews or append new review to state here
       }
     } catch (error) {
+      const err =  error as AxiosError<ApiResponse<null>>
+      console.log(err.response)
       toast.error("Unable to post review");
     }
   };

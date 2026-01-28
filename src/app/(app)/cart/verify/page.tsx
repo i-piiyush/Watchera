@@ -95,7 +95,8 @@ export default function VerifyPage() {
 
         setUser(res.data.data);
       } catch (error) {
-        console.log(error);
+        const err = error as AxiosError<ApiResponse<null>>
+        toast.error(err.response?.data?.message || "error fetching user")
       } finally {
         setLoading(false);
       }
@@ -213,13 +214,7 @@ export default function VerifyPage() {
           },
         );
 
-        // End
-        console.log("Flow complete:", {
-          email: watch("email"),
-          otp: watch("otp"),
-          phone: watch("phone"),
-        });
-
+      
         router.replace("/checkout")
 
 

@@ -13,6 +13,7 @@ import {
   LogOut,
   UserCircle,
   LayoutDashboard,
+  Package,
 } from "lucide-react";
 
 // UI Components
@@ -27,10 +28,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
+import { useCartStore } from "@/store/cartStore";
 
 const Navbar = () => {
   const { user, loading, role } = useAuthStore();
+  const {items} = useCartStore()
   const router = useRouter();
+
+  
+
 
   const handleLogout = async () => {
     try {
@@ -48,8 +54,8 @@ const Navbar = () => {
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex-shrink-0">
-          <h1 className="text-2xl font-bold tracking-[0.2em] text-zinc-900 font-serif uppercase cursor-pointer">
-            Watchera
+          <h1 className="text-base lg:text-xl font-bold tracking-[0.2em] text-zinc-900 font-serif uppercase cursor-pointer">
+            Chhabra Gifts
           </h1>
         </Link>
 
@@ -71,6 +77,8 @@ const Navbar = () => {
             className="relative text-zinc-600 hover:text-black"
             onClick={() => router.replace("/cart")}
           >
+            {items.length > 0 &&  <span className="bg-zinc-900 text-white text-[8px] flex justify-center items-center  rounded-full h-3 w-3 p-2 absolute -top-0.5 -left-0.5">{items.length}</span>}
+           
             <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
           </Button>
 
@@ -120,9 +128,9 @@ const Navbar = () => {
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem onClick={() => router.push("/profile")}>
-                  <UserCircle className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
+                <DropdownMenuItem onClick={() => router.push("/orders")}>
+                  <Package className="mr-2 h-4 w-4" />
+                  <span>Orders</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />

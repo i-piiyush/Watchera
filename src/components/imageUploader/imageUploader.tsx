@@ -53,7 +53,7 @@ export default function ImageUploader({ folder, onUpload }: Props) {
         /**
          * Called AFTER successful upload to ImageKit
          */
-        onSuccess={(res) => {
+        onSuccess={(res:any) => {
           onUpload({
             url: res.url,     // CDN URL
             fileId: res.fileId, // Needed for delete later
@@ -62,7 +62,7 @@ export default function ImageUploader({ folder, onUpload }: Props) {
         /**
          * Upload error handling
          */
-        onError={(err) => {
+        onError={(err:any) => {
           console.error("Image upload failed:", err);
         }}
       />

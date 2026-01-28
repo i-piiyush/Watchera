@@ -43,8 +43,7 @@ export const POST = async (req: Request) => {
       ...parsed.data,
       ratingSum: 0,
       reviewCount: 0,
-      // ✅ FIXED: Correctly assign value or null
-      discountedPrice: parsed.data.discountedPrice ?? null, 
+      discountedPrice: parsed.data.discountedPrice ?? undefined, 
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };

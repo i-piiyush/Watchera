@@ -348,10 +348,10 @@ const ViewProductPage = ({ params }: { params: Promise<{ uid: string }> }) => {
                     onClick={() =>
                         handleAddToCart({
                         product,
-                        user,
+                        
                         variant: selectedVariant,
                         addItem,
-                        router,
+                       
                         })
                     }
                 />

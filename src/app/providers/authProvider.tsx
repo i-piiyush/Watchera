@@ -3,8 +3,8 @@
 import { auth } from "@/firebase/client";
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect } from "react";
-import { useAuthStore } from "@/store/authStore";
 import axios from "axios";
+import { useAuthStore } from "@/store/authStore";
 import { ApiResponse } from "@/types/apiResponse";
 import { AppUser } from "@/types/user";
 import { mergeCartAfterLogin } from "@/lib/mergeCartAfterLogin";
@@ -19,7 +19,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         if (!user) {
           resetAuth();
-          setLoading(false);
           return;
         }
 
@@ -31,29 +30,28 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         if (!res.data.data) {
-          // Check if the user was created very recently (e.g., last 10 seconds)
-          // This helps identify if it's just a signup race condition
-          const isBrandNewUser =
-            user.metadata.creationTime &&
-            Date.now() - new Date(user.metadata.creationTime).getTime() < 10000;
+          // Signup race window (10s)
+          const createdAt = user.metadata.creationTime
+            ? new Date(user.metadata.creationTime).getTime()
+            : 0;
 
-          if (isBrandNewUser) {
-            // Don't logout! Just assume default role and wait for next sync or page load.
-            setRole("user");
-            setLoading(false);
+          if (Date.now() - createdAt < 10_000) {
+            setRole("user"); // default optimistic role
             return;
           }
+
           resetAuth();
           return;
         }
 
         setRole(res.data.data.role);
-
         await mergeCartAfterLogin();
       } catch (error) {
+        console.error("AuthProvider error:", error);
         resetAuth();
       } finally {
-        setLoading(false); // ✅ ALWAYS
+        // 🔥 THIS is what fixes infinite navbar loading
+        setLoading(false);
       }
     });
 

@@ -10,7 +10,7 @@ export const fetchProducts= async ({
       `/api/products?limit=20${pageParam ? `&cursor=${pageParam}` : ""}`
     );
 
-    console.log(res.data)
+  
     return res.data
   
   } catch (error) {

@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
 // Stores & Config
 import { useAuthStore } from "@/store/authStore";
@@ -28,7 +28,7 @@ import {
   shippingSchemaFrontend,
 } from "@/app/schemas/shipingSchema";
 
-// Shadcn UI Components (items-based Select)
+// Shadcn UI Components
 import {
   Select,
   SelectContent,
@@ -150,7 +150,6 @@ export default function Checkout() {
   const total = subtotal;
   const advanceAmount = Math.ceil(total * 0.1);
 
-  // Inside your component
   const onSubmit = async (formData: ShippingFormData) => {
     setCheckoutLoading(true);
     try {
@@ -201,7 +200,7 @@ export default function Checkout() {
         key: rzpOrderData.key,
         amount: rzpOrderData.amount,
         currency: rzpOrderData.currency,
-        name: "Watchera",
+        name: "Chhabra gifts",
         description: "Order Payment",
         order_id: rzpOrderData.razorpayOrderId,
 
@@ -228,31 +227,22 @@ export default function Checkout() {
             const verifyData = verifyRes.data;
 
             if (verifyData?.success) {
-              // ✅ SUCCESS!
               toast.success("Order Placed Successfully!");
-
-              // 2. Clear Local Cart (Fixes "Cart empty nahi ho raha")
               clearCart();
-
-              // 3. Redirect to Success Page
-              // Note: We do NOT stop checkoutLoading here.
-              // We let the spinner run until the page changes.
-              router.replace(`/order-success?orderId=${verifyData.orderId}`);
+              router.replace(`/orders`);
             } else {
-              // ❌ Verification Failed (Backend said no)
               console.error("Verification Failed:", verifyData);
               toast.error(
                 "Payment Verification Failed. Please contact support.",
               );
-              setCheckoutLoading(false); // Stop spinner so user can try again
+              setCheckoutLoading(false);
             }
           } catch (verifyError) {
-            // ❌ Network/Server Error
             console.error("Verification Error:", verifyError);
             toast.error(
               "Payment successful but verification failed. Check My Orders.",
             );
-            setCheckoutLoading(false); // Stop spinner
+            setCheckoutLoading(false);
           }
         },
         theme: { color: "#F3DF96" },
@@ -270,11 +260,10 @@ export default function Checkout() {
       toast.error("Something went wrong");
       setCheckoutLoading(false);
     } finally {
-      setCheckoutLoading(false);
+      // Keep loading true if successful to prevent double clicks during redirect
     }
   };
 
-  /** ---------- items-based select list ---------- */
   const stateItems = useMemo(
     () => [
       { label: "Select a state", value: null as string | null },
@@ -283,7 +272,6 @@ export default function Checkout() {
     [],
   );
 
-  /** ---------- Minimal Style Tokens ---------- */
   const ui = {
     page: "min-h-screen bg-white text-zinc-900",
     container: "max-w-6xl mx-auto px-4 sm:px-6 py-10 lg:py-14",
@@ -328,7 +316,6 @@ export default function Checkout() {
               </h1>
               <p className="mt-1 text-sm text-zinc-500">Loading your cart…</p>
             </div>
-
             <div className={cn(ui.card, "p-6 space-y-4")}>
               <SkeletonLine w="w-1/2" />
               <SkeletonLine />
@@ -363,7 +350,6 @@ export default function Checkout() {
               Complete your shipping & payment
             </p>
           </div>
-
           <span className={ui.pill}>Total: ₹{total.toLocaleString()}</span>
         </div>
       </div>
@@ -483,78 +469,59 @@ export default function Checkout() {
                   <FieldError msg={errors.city?.message} />
                 </div>
 
-                {/* STATE SELECT (items-based like your demo) */}
-                <div>
-                  <label className={ui.label}>State</label>
+              <div className="sm:col-span-2">
+  <label className={ui.label}>State</label>
 
-                  <Select
-                    items={stateItems}
-                    onValueChange={(val: string | null) => {
-                      if (!val) return;
-                      setValue("state", val as (typeof INDIAN_STATES)[number], {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      });
-                      trigger("state");
-                    }}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        "h-12 w-full rounded-xl border bg-white px-4 text-[14px]",
-                        "transition-all duration-200",
-                        "hover:border-zinc-300",
-                        "focus:ring-4 focus:ring-zinc-100 focus:border-zinc-900",
-                        errors.state
-                          ? "border-red-400 focus:ring-red-50"
-                          : "border-zinc-200",
-                      )}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
+  <Select
+    // ❌ REMOVED: items={stateItems}
+    onValueChange={(val: string) => {
+      if (!val) return;
+      setValue("state", val as (typeof INDIAN_STATES)[number], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      trigger("state");
+    }}
+    value={selectedState || undefined} // Controlled value
+  >
+    <SelectTrigger
+      className={cn(
+        "h-12 w-full rounded-xl border bg-white px-4 text-[14px]",
+        "transition-all duration-200",
+        "hover:border-zinc-300",
+        "focus:ring-4 focus:ring-zinc-100 focus:border-zinc-900",
+        errors.state
+          ? "border-red-400 focus:ring-red-50"
+          : "border-zinc-200"
+      )}
+    >
+      <SelectValue placeholder="Select a state" />
+    </SelectTrigger>
 
-                    <SelectContent className="bg-white border-zinc-200 max-h-72 [&_[data-state=checked]>span]:hidden">
-                      <SelectGroup>
-                        <SelectLabel>States</SelectLabel>
+    <SelectContent className="bg-white border-zinc-200 max-h-72">
+      <SelectGroup>
+        <SelectLabel>States</SelectLabel>
 
-                        {stateItems.map((item) => {
-                          const isSelected =
-                            item.value !== null && item.value === selectedState;
+        {/* ✅ CORRECT WAY: Map items here inside Content */}
+        {stateItems.map((item) => {
+          if (!item.value) return null; // Skip the "Select a state" placeholder item from list
 
-                          return (
-                            <SelectItem
-                              key={String(item.value)}
-                              value={item.value as any}
-                              className={cn(
-                                // layout
-                                "relative flex items-center justify-between gap-3",
-                                "py-2 pl-3 pr-10 cursor-pointer",
-                                "focus:bg-zinc-50 focus:text-zinc-900",
-                                "data-[state=checked]:bg-zinc-50",
+          return (
+            <SelectItem
+              key={item.value}
+              value={item.value}
+              className="cursor-pointer focus:bg-zinc-50 focus:text-zinc-900"
+            >
+              {item.label}
+            </SelectItem>
+          );
+        })}
+      </SelectGroup>
+    </SelectContent>
+  </Select>
 
-                                // IMPORTANT: hide default left indicator injected by shadcn
-                                "data-[state=checked]:[&>span:first-child]:hidden",
-                              )}
-                            >
-                              <span className="text-sm">{item.label}</span>
-
-                              {/* Right side tick */}
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <Check
-                                  className={cn(
-                                    "w-4 h-4 text-zinc-900 transition-opacity",
-                                    isSelected ? "opacity-100" : "opacity-0",
-                                  )}
-                                />
-                              </span>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-
-                  <FieldError msg={errors.state?.message as any} />
-                </div>
+  <FieldError msg={errors.state?.message} />
+</div>
 
                 <div className="sm:col-span-2">
                   <label className={ui.label}>Pincode</label>
@@ -605,7 +572,6 @@ export default function Checkout() {
                       >
                         <CreditCard className="w-4 h-4" />
                       </div>
-
                       <div>
                         <p className="text-sm font-semibold text-zinc-900">
                           Online payment
@@ -615,7 +581,6 @@ export default function Checkout() {
                         </p>
                       </div>
                     </div>
-
                     <AnimatePresence>
                       {paymentMethod === "online" && (
                         <motion.div
@@ -657,7 +622,6 @@ export default function Checkout() {
                       >
                         <Truck className="w-4 h-4" />
                       </div>
-
                       <div>
                         <p className="text-sm font-semibold text-zinc-900">
                           Cash on delivery
@@ -667,7 +631,6 @@ export default function Checkout() {
                         </p>
                       </div>
                     </div>
-
                     <AnimatePresence>
                       {paymentMethod === "cod" && (
                         <motion.div
@@ -685,23 +648,12 @@ export default function Checkout() {
               </div>
             </section>
 
-            {/* Mobile Pay Button */}
-            <div className="lg:hidden pb-20">
-              <button
-                type="submit"
-                disabled={checkoutLoading}
-                className={ui.button}
-              >
-                {checkoutLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Processing…
-                  </>
-                ) : (
-                  PayLabel
-                )}
-              </button>
-            </div>
+            {/* --------------------------------------------------------- */}
+            {/* UPDATED: We removed the inline button here.               */}
+            {/* Added a Spacer instead so content isn't hidden behind     */}
+            {/* the fixed bottom bar on mobile.                           */}
+            {/* --------------------------------------------------------- */}
+            <div className="lg:hidden pb-24" />
           </motion.div>
 
           {/* RIGHT: Summary */}
@@ -730,7 +682,6 @@ export default function Checkout() {
                           className="w-full h-full object-cover"
                         />
                       </div>
-
                       <div className="flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-medium leading-snug">
@@ -740,7 +691,6 @@ export default function Checkout() {
                             ₹{item.priceSnapshot.toLocaleString()}
                           </p>
                         </div>
-
                         <p className="mt-1 text-xs text-zinc-500">
                           {item.variantColor} · Qty {item.quantity}
                         </p>
@@ -756,12 +706,10 @@ export default function Checkout() {
                       ₹{subtotal.toLocaleString()}
                     </span>
                   </div>
-
                   <div className="flex justify-between text-zinc-600">
                     <span>Shipping</span>
                     <span className="font-medium text-zinc-900">Free</span>
                   </div>
-
                   <div className="flex justify-between pt-3 border-t border-zinc-200">
                     <span className="font-semibold text-zinc-900">Total</span>
                     <span className="font-semibold text-zinc-900">
@@ -770,7 +718,7 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                <div className="mt-5">
+                <div className="mt-5 ">
                   <motion.button
                     type="submit"
                     disabled={checkoutLoading}
@@ -803,8 +751,8 @@ export default function Checkout() {
         </form>
       </div>
 
-      {/* Mobile Bottom Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white/80 backdrop-blur p-4">
+      {/* Mobile Bottom Bar (Fixed) */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white/80 backdrop-blur p-4 z-50">
         <button
           type="submit"
           onClick={handleSubmit(onSubmit)}

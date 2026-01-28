@@ -1,4 +1,4 @@
-import { BarChart3, Percent, PlusSquare, Trash2 } from "lucide-react";
+import { BarChart3, Package, Percent, PlusSquare, Trash2 } from "lucide-react";
 
 import {
   Sidebar,
@@ -19,6 +19,11 @@ export const items = [
     title: "Add Products",
     url: "/admin/add-products",
     icon: PlusSquare, // ➕ clearly means create/add
+  },
+  {
+    title: "Orders",
+    url: "/admin/orders",
+    icon: Package, // 📦 Represents orders/shipments
   },
   {
     title: "Delete Products",

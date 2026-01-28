@@ -28,15 +28,19 @@ export const POST = async (
     const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
     const user = userSnap.data();
 
+
+
     const body = await req.json();
     const parsed = ReviewSchema.safeParse({
       ...body,
       userId: decoded.uid,
-      user: user?.name ?? "Anonymous",
+      user: user?.name ||  "Anonymous",
       avatar: user?.avatar ?? "",
       isLiked:false,
       createdAt: Date.now(),
     });
+
+
 
     if (!parsed.success) {
       return NextResponse.json<ApiResponse<null>>(
