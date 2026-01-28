@@ -193,7 +193,7 @@ const Cart = () => {
   );
   const shipping = 0;
   const total = subtotal + shipping;
-  const tax = subtotal * 0.18;
+
 
   // -----------------------------
   // 1. LOADING STATE (Auth OR Data Fetching)
@@ -350,12 +350,7 @@ const Cart = () => {
                     {shipping === 0 ? "Free" : formatPrice(shipping)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Tax (18%)</span>
-                  <span className="font-mono text-zinc-900">
-                    {formatPrice(tax)}
-                  </span>
-                </div>
+               
               </div>
 
               <div className="my-6 border-b-2 border-dashed border-zinc-200 w-[110%] -ml-4" />
@@ -365,7 +360,7 @@ const Cart = () => {
                   Total Due
                 </span>
                 <span className="text-2xl font-mono font-medium text-zinc-900">
-                  {formatPrice(total + tax)}
+                  {formatPrice(total)}
                 </span>
               </div>
 
